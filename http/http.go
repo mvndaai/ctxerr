@@ -49,10 +49,10 @@ type (
 
 	// Details of a response
 	Details struct {
+		TraceID string                 `json:"traceID,omitempty"`
 		Code    string                 `json:"code"`
 		Action  string                 `json:"action,omitempty"`
 		Message string                 `json:"messsage,omitempty"`
-		TraceID string                 `json:"traceID,omitempty"`
 		Fields  map[string]interface{} `json:"fields,omitempty"`
 	}
 )
