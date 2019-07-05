@@ -25,7 +25,7 @@ Context
 A context is passed in so that anywhere in code more information can be added.
 Adding information (aka fields) to a context is done by:
 	ctx = ctxerr.SetField(ctx, "field", "value")
-	ctx = ctxerr.SetFields(ctx, map[string]interface{"foo": "bar", "baz": 0})
+	ctx = ctxerr.SetFields(ctx, map[string]interface{}{"foo": "bar", "baz": 0})
 
 Some common field keys have been predefined to be used in this or sub packages.
 This includes 'FieldKeyCode' which is used to set the 'code' passed into the New/Wrap functions on the context.
