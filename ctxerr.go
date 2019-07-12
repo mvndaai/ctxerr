@@ -99,6 +99,8 @@ const (
 	FieldKeyStatusCode = "error_status_code"
 	// FieldKeyAction is an action that a user can take to fix the error
 	FieldKeyAction = "error_action"
+	//FieldKeyCategory can be used with IsCategorgy(...) to determin a category of error
+	FieldKeyCategory = "error_category"
 	// FieldKeyRelatedCode can be used when there is a second error but want the original code in the logs
 	FieldKeyRelatedCode = "error_related_code"
 
@@ -301,6 +303,32 @@ func Deepest(err error) CtxErr {
 		break
 	}
 	return e
+}
+
+// IsCategory tells if an error in the chain matches the category
+func IsCategory(err error, category interface{}) bool {
+	if err == nil {
+		return false
+	}
+	var e CtxErr = &impl{}
+	if ok := xerrors.Is(err, e); !ok {
+		return false
+	}
+	xerrors.As(err, &e)
+	for {
+		if c, ok := e.Fields()[FieldKeyCategory]; ok {
+			if c == category {
+				return true
+			}
+		}
+		u := xerrors.Unwrap(e)
+		if ok := xerrors.Is(u, e); ok {
+			xerrors.As(u, &e)
+			continue
+		}
+		break
+	}
+	return false
 }
 
 /* Implementation helper code */

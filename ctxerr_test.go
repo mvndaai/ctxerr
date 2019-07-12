@@ -386,3 +386,81 @@ func TestDefaultLogNonJSONFields(t *testing.T) {
 		t.Errorf("Logs did not match\n%s\n%s", log, expectedLog)
 	}
 }
+
+func TestCategory(t *testing.T) {
+	tests := []struct {
+		name     string
+		match    bool
+		category interface{}
+		toErr    func(context.Context) error
+	}{
+		{
+			name:     "normal",
+			match:    false,
+			category: nil,
+			toErr: func(ctx context.Context) error {
+				return ctxerr.New(ctx, "code", "msg")
+			},
+		},
+		{
+			name:     "nil",
+			match:    false,
+			category: nil,
+			toErr:    func(ctx context.Context) error { return nil },
+		},
+		{
+			name:     "string",
+			match:    true,
+			category: "str",
+			toErr: func(ctx context.Context) error {
+				return ctxerr.New(ctx, "code", "msg")
+			},
+		},
+		{
+			name:     "int",
+			match:    true,
+			category: 10,
+			toErr: func(ctx context.Context) error {
+				return ctxerr.New(ctx, "code", "msg")
+			},
+		},
+		{
+			name:     "wrapped external",
+			match:    true,
+			category: "str",
+			toErr: func(ctx context.Context) error {
+				return ctxerr.Wrap(ctx, errors.New(""), "code", "msg")
+			},
+		},
+		{
+			name:     "wrapped has value",
+			match:    true,
+			category: "str",
+			toErr: func(ctx context.Context) error {
+				err := ctxerr.New(ctx, "code", "msg")
+				return ctxerr.QuickWrap(context.Background(), err)
+			},
+		},
+		{
+			name:     "go error",
+			match:    false,
+			category: "str",
+			toErr:    func(ctx context.Context) error { return errors.New("") },
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			if test.category != nil {
+				ctx = ctxerr.SetField(ctx, ctxerr.FieldKeyCategory, test.category)
+			}
+
+			err := test.toErr(ctx)
+			ic := ctxerr.IsCategory(err, test.category)
+			if ic != test.match {
+				t.Error("Category match was unexpected")
+			}
+		})
+	}
+}
