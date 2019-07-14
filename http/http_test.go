@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"testing"
 
-	"go.opencensus.io/trace"
 	"github.com/mvndaai/ctxerr"
 	"github.com/mvndaai/ctxerr/http"
+	"go.opencensus.io/trace"
 )
 
 func TestStatusCodeAndResponse(t *testing.T) {
@@ -65,7 +65,7 @@ func TestStatusCodeAndResponse(t *testing.T) {
 			expectedCode:       happyCode,
 			expectedAction:     "",
 			expectedMessage:    happyMessage,
-			expectedFields:     map[string]interface{}{ctxerr.FieldKeyCode: happyCode},
+			expectedFields:     nil,
 		},
 		{
 			name:        "action",
@@ -79,7 +79,7 @@ func TestStatusCodeAndResponse(t *testing.T) {
 			expectedCode:       happyCode,
 			expectedAction:     "action",
 			expectedMessage:    happyMessage,
-			expectedFields:     map[string]interface{}{ctxerr.FieldKeyCode: happyCode, ctxerr.FieldKeyAction: "action"},
+			expectedFields:     nil,
 		},
 		{
 			name: "status code int",
@@ -113,9 +113,20 @@ func TestStatusCodeAndResponse(t *testing.T) {
 			expectedWarnings:   true,
 		},
 		{
-			name: "status code other",
+			name: "status code typed int",
 			err: func() error {
 				ctx := ctxerr.SetField(context.Background(), ctxerr.FieldKeyStatusCode, int64(400))
+				return ctxerr.New(ctx, happyCode, happyMessage)
+			}(),
+
+			expectedStatusCode: 400,
+			expectedCode:       happyCode,
+			expectedWarnings:   false,
+		},
+		{
+			name: "status code other",
+			err: func() error {
+				ctx := ctxerr.SetField(context.Background(), ctxerr.FieldKeyStatusCode, true)
 				return ctxerr.New(ctx, happyCode, happyMessage)
 			}(),
 

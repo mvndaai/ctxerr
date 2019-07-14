@@ -87,7 +87,7 @@ import (
 	"log"
 	"path/filepath"
 	"runtime"
-	"strconv"
+	"strings"
 
 	"golang.org/x/xerrors"
 )
@@ -264,17 +264,8 @@ func DefaultOnHandle(err error) {
 	}
 	logger := LogError
 	if de := Deepest(err); de != nil {
-		if sci, ok := de.Fields()[FieldKeyStatusCode]; ok {
-			var statusCode int
-			switch v := sci.(type) {
-			case int:
-				statusCode = v
-			case string:
-				if sc, err := strconv.Atoi(v); err == nil {
-					statusCode = sc
-				}
-			}
-			if statusCode/100 == 4 {
+		if v, ok := de.Fields()[FieldKeyStatusCode]; ok {
+			if strings.HasPrefix(fmt.Sprint(v), "4") {
 				logger = LogWarn
 			}
 		}

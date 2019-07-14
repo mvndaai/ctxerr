@@ -35,10 +35,11 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
-	"go.opencensus.io/trace"
 	"github.com/mvndaai/ctxerr"
+	"go.opencensus.io/trace"
 )
 
 type (
@@ -72,35 +73,34 @@ func StatusCodeAndResponse(err error, showMessage, showFields bool) (int, ErrorR
 		r.Error.TraceID = TraceID(de.Context())
 
 		fields := de.Fields()
-		if showFields {
-			r.Error.Fields = fields
-		}
 		if code, ok := fields[ctxerr.FieldKeyCode]; ok {
 			r.Error.Code = code.(string)
+			delete(fields, ctxerr.FieldKeyCode)
 		}
 		if action, ok := fields[ctxerr.FieldKeyAction]; ok {
 			r.Error.Action = action.(string)
+			delete(fields, ctxerr.FieldKeyAction)
 		}
 		if sci, ok := fields[ctxerr.FieldKeyStatusCode]; ok {
 			switch v := sci.(type) {
 			case int:
 				statusCode = v
-			case string:
-				sc, err := strconv.Atoi(v)
+				delete(fields, ctxerr.FieldKeyCode)
+			default:
+				sc, err := strconv.Atoi(fmt.Sprint(v))
 				if err != nil {
 					ctx := ctxerr.SetField(de.Context(), ctxerr.FieldKeyRelatedCode, fields[ctxerr.FieldKeyCode])
 					err = ctxerr.Wrap(ctx, err, "d81e453f-ce91-43a4-a443-404873b94c15",
-						"could not convert s")
+						"could not convert status code to int")
 					ctxerr.LogWarn(err)
 					break
 				}
 				statusCode = sc
-			default:
-				ctx := ctxerr.SetField(de.Context(), ctxerr.FieldKeyRelatedCode, fields[ctxerr.FieldKeyCode])
-				err := ctxerr.New(ctx, "594b85d2-0558-4335-9792-1117c22329be",
-					"could not convert field '%s:%v' type '%T' to int", ctxerr.FieldKeyStatusCode, v, v)
-				ctxerr.LogWarn(err)
+				delete(fields, ctxerr.FieldKeyCode)
 			}
+		}
+		if showFields {
+			r.Error.Fields = fields
 		}
 	}
 
