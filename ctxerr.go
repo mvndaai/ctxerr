@@ -192,24 +192,24 @@ func Fields(ctx context.Context) map[string]interface{} {
 
 // SetField adds a field onto the context
 func SetField(ctx context.Context, key string, value interface{}) context.Context {
-	fields := Fields(ctx)
-	if fields == nil {
-		fields = map[string]interface{}{}
+	f := make(map[string]interface{}, 0)
+	for k, v := range Fields(ctx) {
+		f[k] = v
 	}
-	fields[key] = value
-	return context.WithValue(ctx, FieldsKey, fields)
+	f[key] = value
+	return context.WithValue(ctx, FieldsKey, f)
 }
 
 // SetFields can add multiple fields onto the context
 func SetFields(ctx context.Context, fields map[string]interface{}) context.Context {
-	current := Fields(ctx)
-	if current == nil {
-		current = map[string]interface{}{}
+	f := make(map[string]interface{}, 0)
+	for k, v := range Fields(ctx) {
+		f[k] = v
 	}
 	for k, v := range fields {
-		current[k] = v
+		f[k] = v
 	}
-	return context.WithValue(ctx, FieldsKey, current)
+	return context.WithValue(ctx, FieldsKey, f)
 }
 
 //CallerFunc gets the name of the calling function

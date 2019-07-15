@@ -464,3 +464,39 @@ func TestCategory(t *testing.T) {
 		})
 	}
 }
+
+func TestAddingToContext(t *testing.T) {
+	actx := context.Background()
+	var bKey interface{} = "b"
+	bKeyVal := "b"
+	bctx := context.WithValue(actx, bKey, bKeyVal)
+
+	if v := actx.Value(bKey); v != nil {
+		t.Error("actx had a value it shouldn't have", v)
+
+	}
+	if v := bctx.Value(bKey); v != bKeyVal {
+		t.Error("bctx had value that didn't match what it should have", v)
+	}
+
+	cctx := context.Background()
+	dMapKey, dMapValue := "d", "d"
+	dctx := ctxerr.SetField(cctx, dMapKey, dMapValue)
+	eMapKey, eMapValue := "e", "e"
+	ectx := ctxerr.SetField(dctx, eMapKey, eMapValue)
+
+	if f := ctxerr.Fields(cctx); len(f) != 0 {
+		t.Error("cctx had an incorrect amount of fields", f)
+	}
+	if f := ctxerr.Fields(dctx); len(f) != 1 {
+		t.Error("dctx had an incorrect amount of fields", f)
+	}
+	if f := ctxerr.Fields(ectx); len(f) != 2 {
+		t.Error("ectx had an incorrect amount of fields", f)
+	}
+
+	fctx := ctxerr.SetFields(ectx, map[string]interface{}{"f": "f", "g": "g"})
+	if f := ctxerr.Fields(fctx); len(f) != 4 {
+		t.Error("fctx had an incorrect amount of fields", f)
+	}
+}
