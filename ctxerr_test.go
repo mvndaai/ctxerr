@@ -20,8 +20,8 @@ func TestFields(t *testing.T) {
 	ctx = ctxerr.SetField(ctx, fk, "baz")
 	ctx = ctxerr.SetField(ctx, fk, fv)
 
-	e := ctxerr.Deepest(ctxerr.New(ctx, "1c678a4a-305f-4f68-880f-f459009e42ee", "msg"))
-	for k, v := range e.Fields() {
+	f := ctxerr.AllFields(ctxerr.New(ctx, "1c678a4a-305f-4f68-880f-f459009e42ee", "msg"))
+	for k, v := range f {
 		if k == fk {
 			if v != fv {
 				t.Error("field value was incorrect: ", v)
@@ -30,7 +30,7 @@ func TestFields(t *testing.T) {
 	}
 
 	if t.Failed() {
-		t.Logf("fields %+v", e.Fields())
+		t.Logf("fields %+v", f)
 	}
 }
 
@@ -223,8 +223,7 @@ func TestQuickWrap(t *testing.T) {
 				t.Error("Warning did not match")
 			}
 
-			ce := ctxerr.Deepest(err)
-			code := ce.Fields()[ctxerr.FieldKeyCode]
+			code := ctxerr.AllFields(err)[ctxerr.FieldKeyCode]
 			if code != test.expectedCode {
 				t.Error("Code did not match", code, test.expectedCode)
 			}
@@ -241,7 +240,7 @@ func TestNils(t *testing.T) {
 	}
 }
 
-func TestDefaultOnHandle(t *testing.T) {
+func TestDefaultHandle(t *testing.T) {
 
 	tests := []struct {
 		name          string
@@ -498,5 +497,30 @@ func TestAddingToContext(t *testing.T) {
 	fctx := ctxerr.SetFields(ectx, map[string]interface{}{"f": "f", "g": "g"})
 	if f := ctxerr.Fields(fctx); len(f) != 4 {
 		t.Error("fctx had an incorrect amount of fields", f)
+	}
+}
+
+func TestAllFields(t *testing.T) {
+	if f := ctxerr.AllFields(nil); f == nil {
+		t.Error("fields shouldn't have been nil")
+	}
+	if f := ctxerr.AllFields(errors.New("a")); len(f) != 0 {
+		t.Error("fields without a context should have no values")
+	}
+
+	ctx := context.Background()
+	ctx = ctxerr.SetField(ctx, "a", "a")
+	err := ctxerr.New(ctx, "a", "a")
+
+	ctx = ctxerr.SetField(ctx, "b", "b")
+	err = ctxerr.QuickWrap(ctx, err)
+
+	fields := ctxerr.AllFields(err)
+	b, ok := fields["b"]
+	if !ok {
+		t.Fatal("b was not found in fields")
+	}
+	if b != "b" {
+		t.Error("b value did not match", b)
 	}
 }

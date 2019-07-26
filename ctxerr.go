@@ -116,7 +116,7 @@ var (
 	OnNew = DefaultOnNew
 	// OnEmptyCode is called when an error is created with an empty string for a code
 	OnEmptyCode = DefaultOnEmptyCode
-	// OnHandle should be called when handling an error
+	// Handle should be called when handling an error
 	Handle = DefaultHandler
 
 	//FieldsKey is the key used to add and decode fields on the context
@@ -271,6 +271,24 @@ func DefaultHandler(err error) {
 		}
 	}
 	logger(err)
+}
+
+// AllFields unwraps the error collecting/replacing fields as it goes down the tree
+func AllFields(err error) map[string]interface{} {
+	f := map[string]interface{}{}
+	var e CtxErr = &impl{}
+	for {
+		if err == nil {
+			return f
+		}
+		if ok := xerrors.As(err, &e); !ok {
+			return f
+		}
+		for k, v := range e.Fields() {
+			f[k] = v
+		}
+		err = xerrors.Unwrap(err)
+	}
 }
 
 // Deepest retrieves the deepest CtxErr or nil if one does not exist

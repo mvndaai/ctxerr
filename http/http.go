@@ -71,8 +71,10 @@ func StatusCodeAndResponse(err error, showMessage, showFields bool) (int, ErrorR
 
 	if de := ctxerr.Deepest(err); de != nil {
 		r.Error.TraceID = TraceID(de.Context())
+	}
 
-		fields := de.Fields()
+	fields := ctxerr.AllFields(err)
+	if len(fields) > 0 {
 		if code, ok := fields[ctxerr.FieldKeyCode]; ok {
 			r.Error.Code = code.(string)
 			delete(fields, ctxerr.FieldKeyCode)
@@ -89,10 +91,11 @@ func StatusCodeAndResponse(err error, showMessage, showFields bool) (int, ErrorR
 			default:
 				sc, err := strconv.Atoi(fmt.Sprint(v))
 				if err != nil {
-					ctx := ctxerr.SetField(de.Context(), ctxerr.FieldKeyRelatedCode, fields[ctxerr.FieldKeyCode])
-					err = ctxerr.Wrap(ctx, err, "d81e453f-ce91-43a4-a443-404873b94c15",
-						"could not convert status code to int")
-					ctxerr.LogWarn(err)
+					ctx := ctxerr.SetField(context.Background(), ctxerr.FieldKeyRelatedCode, fields[ctxerr.FieldKeyCode])
+					ctx = ctxerr.SetField(ctx, "status code", v)
+					ctx = ctxerr.SetField(ctx, ctxerr.FieldKeyStatusCode, 418)
+					err = ctxerr.Wrap(ctx, err, "d81e453f-ce91-43a4-a443-404873b94c15", "could not convert status code to int")
+					ctxerr.Handle(err)
 					break
 				}
 				statusCode = sc
