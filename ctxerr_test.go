@@ -457,7 +457,7 @@ func TestCategory(t *testing.T) {
 			}
 
 			err := test.toErr(ctx)
-			ic := ctxerr.IsCategory(err, test.category)
+			ic := ctxerr.HasCategory(err, test.category)
 			if ic != test.match {
 				t.Error("Category match was unexpected")
 			}

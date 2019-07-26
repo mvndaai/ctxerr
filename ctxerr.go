@@ -296,8 +296,8 @@ func Deepest(err error) CtxErr {
 	return e
 }
 
-// IsCategory tells if an error in the chain matches the category
-func IsCategory(err error, category interface{}) bool {
+// HasCategory tells if an error in the chain matches the category
+func HasCategory(err error, category interface{}) bool {
 	if err == nil {
 		return false
 	}
