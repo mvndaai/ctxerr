@@ -24,7 +24,7 @@ import (
 func ErrorHandler(showMessage, showFields bool) func(err error, c echo.Context) {
 
 	return func(err error, c echo.Context) {
-		ctxerr.OnHandle(err)
+		ctxerr.Handle(err)
 		statusCode, response := http.StatusCodeAndResponse(err, showMessage, showFields)
 
 		// Catch 404s or other routing errors

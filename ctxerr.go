@@ -47,9 +47,9 @@ The functions are public vars so they can be replaced for any logging setup.
 	ctxerr.LogError(err)
 
 
-On Functions
+Configurable Functions
 
-The On functions (OnNew, OnHandle, and OnEmptyCode) are public vars so they can be customized.
+The configurable functions (OnNew, Handle, and OnEmptyCode) are public vars so they can be customized.
 
 OnNew is automatically called on a New or Wrap. Replace it to add custom fields on creation.
 The default is to add the code as a field on the context.
@@ -117,7 +117,7 @@ var (
 	// OnEmptyCode is called when an error is created with an empty string for a code
 	OnEmptyCode = DefaultOnEmptyCode
 	// OnHandle should be called when handling an error
-	OnHandle = DefaultOnHandle
+	Handle = DefaultHandler
 
 	//FieldsKey is the key used to add and decode fields on the context
 	FieldsKey interface{} = contextKey("fields")
@@ -257,8 +257,8 @@ func DefaultOnEmptyCode(err CtxErr) CtxErr {
 	return err
 }
 
-// DefaultOnHandle is the default of OnHandle function that should be called when handling an error
-func DefaultOnHandle(err error) {
+// DefaultHandler is the default way of handling an error, logging with the fields
+func DefaultHandler(err error) {
 	if err == nil {
 		return
 	}

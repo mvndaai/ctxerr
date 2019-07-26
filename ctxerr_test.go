@@ -313,7 +313,7 @@ func TestDefaultOnHandle(t *testing.T) {
 			logWarn := false
 			ctxerr.LogWarn = func(err error) { logWarn = true }
 
-			ctxerr.DefaultOnHandle(test.err)
+			ctxerr.DefaultHandler(test.err)
 
 			if logError != test.expectedError {
 				t.Error("Log severity 'error' did not match")
