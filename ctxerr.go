@@ -58,7 +58,7 @@ OnEmptyCode is automatically called when creating an error that has a code of an
 The default behavior is to unwrap the error looking for a previous code.
 If one does not exist an error will be logged.
 
-OnHandle exists to make sure all errors are handled in the say way.
+Handle exists to make sure all errors are handled in the say way.
 The default behavior is to log the error.
 It should be called only once at the top of all wrapped errors.
 (i.e. HTTP handle functions or goroutines)
@@ -66,7 +66,7 @@ It should be called only once at the top of all wrapped errors.
 	go func(ctx context.Context){
 		if err := foo(ctx) {
 			err = ctxerr.QuickWrap(ctx, err)
-			ctxerr.OnHandle(err)
+			ctxerr.Handle(err)
 		}
 	}(nctx)
 
@@ -192,7 +192,7 @@ func Fields(ctx context.Context) map[string]interface{} {
 
 // SetField adds a field onto the context
 func SetField(ctx context.Context, key string, value interface{}) context.Context {
-	f := make(map[string]interface{}, 0)
+	f := map[string]interface{}{}
 	for k, v := range Fields(ctx) {
 		f[k] = v
 	}
@@ -202,7 +202,7 @@ func SetField(ctx context.Context, key string, value interface{}) context.Contex
 
 // SetFields can add multiple fields onto the context
 func SetFields(ctx context.Context, fields map[string]interface{}) context.Context {
-	f := make(map[string]interface{}, 0)
+	f := map[string]interface{}{}
 	for k, v := range Fields(ctx) {
 		f[k] = v
 	}
@@ -364,7 +364,7 @@ func (im *impl) WithContext(ctx context.Context) { im.ctx = ctx }
 // DefaultLog is the default logging function
 func DefaultLog(severity string) func(error) {
 	return func(err error) {
-		f := make(map[string]interface{}, 0)
+		f := map[string]interface{}{}
 		if e := Deepest(err); e != nil {
 			f = e.Fields()
 		}
