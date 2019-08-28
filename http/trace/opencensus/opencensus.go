@@ -1,3 +1,11 @@
+/*
+Package opencensus can be imported to use opencensus for tracing
+
+As a side effect of importing the package the http.TraceID function gets replaced
+
+import _ "github.com/mvndaai/ctxerr/http/trace/opencensus"
+
+*/
 package opencensus
 
 import (
