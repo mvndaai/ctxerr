@@ -39,7 +39,6 @@ import (
 	"strconv"
 
 	"github.com/mvndaai/ctxerr"
-	"go.opencensus.io/trace"
 )
 
 type (
@@ -110,10 +109,5 @@ func StatusCodeAndResponse(err error, showMessage, showFields bool) (int, ErrorR
 	return statusCode, r
 }
 
-// TraceID uses opencensus to get the trace ID from the context
-func TraceID(ctx context.Context) string {
-	if span := trace.FromContext(ctx); span != nil {
-		return span.SpanContext().TraceID.String()
-	}
-	return ""
-}
+// TraceID is a configurable function to get a traceID from the context.
+var TraceID = func(ctx context.Context) string { return "" }
