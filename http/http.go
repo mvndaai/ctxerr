@@ -68,8 +68,8 @@ func StatusCodeAndResponse(err error, showMessage, showFields bool) (int, ErrorR
 		}
 	}
 
-	if de := ctxerr.Deepest(err); de != nil {
-		r.Error.TraceID = TraceID(de.Context())
+	if ce, ok := ctxerr.As(err); ok {
+		r.Error.TraceID = TraceID(ce.Context())
 	}
 
 	fields := ctxerr.AllFields(err)

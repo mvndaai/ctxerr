@@ -263,11 +263,9 @@ func DefaultHandler(err error) {
 		return
 	}
 	logger := LogError
-	if de := Deepest(err); de != nil {
-		if v, ok := de.Fields()[FieldKeyStatusCode]; ok {
-			if strings.HasPrefix(fmt.Sprint(v), "4") {
-				logger = LogWarn
-			}
+	if v, ok := AllFields(err)[FieldKeyStatusCode]; ok {
+		if strings.HasPrefix(fmt.Sprint(v), "4") {
+			logger = LogWarn
 		}
 	}
 	logger(err)
@@ -291,27 +289,18 @@ func AllFields(err error) map[string]interface{} {
 	}
 }
 
-// Deepest retrieves the deepest CtxErr or nil if one does not exist
-func Deepest(err error) CtxErr {
+// As is a shorthand for errors.As and includes an ok
+func As(err error) (CtxErr, bool) {
 	if err == nil {
-		return nil
+		return nil, false
 	}
 
 	var e CtxErr = &impl{}
-	if ok := xerrors.Is(err, e); !ok {
-		return nil
+	if ok := xerrors.As(err, &e); !ok {
+		return nil, false
 	}
-	xerrors.As(err, &e)
 
-	for {
-		u := xerrors.Unwrap(e)
-		if ok := xerrors.Is(u, e); ok {
-			xerrors.As(u, &e)
-			continue
-		}
-		break
-	}
-	return e
+	return e, true
 }
 
 // HasCategory tells if an error in the chain matches the category
@@ -382,10 +371,7 @@ func (im *impl) WithContext(ctx context.Context) { im.ctx = ctx }
 // DefaultLog is the default logging function
 func DefaultLog(severity string) func(error) {
 	return func(err error) {
-		f := map[string]interface{}{}
-		if e := Deepest(err); e != nil {
-			f = e.Fields()
-		}
+		f := AllFields(err)
 		f[fieldKeyLogSeverity] = severity
 
 		b, merr := json.Marshal(f)

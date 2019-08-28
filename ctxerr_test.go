@@ -231,15 +231,6 @@ func TestQuickWrap(t *testing.T) {
 	}
 }
 
-func TestNils(t *testing.T) {
-	if v := ctxerr.Deepest(nil); v != nil {
-		t.Error("Unexpected non nil on Deepest of nil", v)
-	}
-	if v := ctxerr.Deepest(errors.New("")); v != nil {
-		t.Error("Unexpected non nil on Deepest of non ctxerr", v)
-	}
-}
-
 func TestDefaultHandle(t *testing.T) {
 
 	tests := []struct {
