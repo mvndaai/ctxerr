@@ -181,12 +181,12 @@ func TestIntegrations(t *testing.T) {
 	}
 
 	var logMessage string
-	var logFields string
+	var logFields map[string]interface{}
 	ctxerr.LogError = func(err error) {
 		logMessage = fmt.Sprint(err)
 
 		if ce, ok := err.(ctxerr.CtxErr); ok {
-			logFields = fmt.Sprint(ce.Fields())
+			logFields = ce.Fields()
 		}
 	}
 
@@ -197,16 +197,24 @@ func TestIntegrations(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			warning = false
 			logMessage = "<nil>"
-			logFields = fmt.Sprint(map[string]interface{}{})
+			logFields = map[string]interface{}{}
 
 			ctxerr.LogError(test.toErr(context.Background()))
 
 			if logMessage != test.expectedMessage {
 				t.Errorf("Message did not match log message:\n%s\n%s", logMessage, test.expectedMessage)
 			}
-			if tef := fmt.Sprint(test.expectedFields); logFields != tef {
-				t.Errorf("Fields did not match:\n%s\n%s", logFields, tef)
+
+			if len(test.expectedFields) != len(logFields) {
+				t.Errorf("Fields count did not match:\n%s\n%s", logFields, test.expectedFields)
+
 			}
+			for k, v := range test.expectedFields {
+				if fv := logFields[k]; fv != v {
+					t.Error("field did not match", fv, k)
+				}
+			}
+
 			if warning != test.expectedWarn {
 				t.Error("Warning did not match")
 			}
