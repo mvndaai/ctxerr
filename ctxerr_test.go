@@ -80,11 +80,19 @@ func TestIntegrations(t *testing.T) {
 			expectedFields:  map[string]interface{}{},
 		},
 		{
-			name: "ctxerr",
+			name: "new",
 			toErr: func(ctx context.Context) error {
-				return ctxerr.New(ctx, code, "ctxerr")
+				return ctxerr.New(ctx, code, "", "new")
 			},
-			expectedMessage: "ctxerr",
+			expectedMessage: "new",
+			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code},
+		},
+		{
+			name: "newf",
+			toErr: func(ctx context.Context) error {
+				return ctxerr.Newf(ctx, code, "%s", "newf")
+			},
+			expectedMessage: "newf",
 			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code},
 		},
 		{
@@ -102,15 +110,31 @@ func TestIntegrations(t *testing.T) {
 		{
 			name: "wrap",
 			toErr: func(ctx context.Context) error {
-				return ctxerr.Wrap(ctx, errors.New("wrapped"), code, "wrap")
+				return ctxerr.Wrap(ctx, errors.New("wrapped"), code, "", "wrap")
 			},
 			expectedMessage: "wrap : wrapped",
+			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code},
+		},
+		{
+			name: "wrapf",
+			toErr: func(ctx context.Context) error {
+				return ctxerr.Wrapf(ctx, errors.New("wrapped"), code, "%s", "wrapf")
+			},
+			expectedMessage: "wrapf : wrapped",
 			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code},
 		},
 		{
 			name: "nil wrap",
 			toErr: func(ctx context.Context) error {
 				return ctxerr.Wrap(ctx, nil, code, "nil wrap")
+			},
+			expectedMessage: "<nil>",
+			expectedFields:  map[string]interface{}{},
+		},
+		{
+			name: "nil wrapf",
+			toErr: func(ctx context.Context) error {
+				return ctxerr.Wrapf(ctx, nil, code, "nil wrap")
 			},
 			expectedMessage: "<nil>",
 			expectedFields:  map[string]interface{}{},
@@ -130,6 +154,24 @@ func TestIntegrations(t *testing.T) {
 				return ctxerr.New(ctx, "", "new no code")
 			},
 			expectedMessage: "new no code",
+			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: "no_code"},
+			expectedWarn:    true,
+		},
+		{
+			name: "newf no code",
+			toErr: func(ctx context.Context) error {
+				return ctxerr.Newf(ctx, "", "new no code")
+			},
+			expectedMessage: "new no code",
+			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: "no_code"},
+			expectedWarn:    true,
+		},
+		{
+			name: "wrapf no code",
+			toErr: func(ctx context.Context) error {
+				return ctxerr.Wrapf(ctx, errors.New("error"), "", "wrapf no code")
+			},
+			expectedMessage: "wrapf no code : error",
 			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: "no_code"},
 			expectedWarn:    true,
 		},

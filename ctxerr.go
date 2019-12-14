@@ -146,7 +146,19 @@ type CtxErr interface {
 }
 
 // New creates a new error
-func New(ctx context.Context, code, message string, messageArgs ...interface{}) error {
+func New(ctx context.Context, code string, message ...interface{}) error {
+	var e CtxErr = &impl{
+		ctx: OnNew(ctx, code),
+		msg: fmt.Sprint(message...),
+	}
+	if code == "" {
+		return OnEmptyCode(e)
+	}
+	return e
+}
+
+// Newf creates a new error message formatting
+func Newf(ctx context.Context, code, message string, messageArgs ...interface{}) error {
 	var e CtxErr = &impl{
 		ctx: OnNew(ctx, code),
 		msg: fmt.Sprintf(message, messageArgs...),
@@ -158,7 +170,23 @@ func New(ctx context.Context, code, message string, messageArgs ...interface{}) 
 }
 
 // Wrap creates a new error with another wrapped under it
-func Wrap(ctx context.Context, err error, code, message string, messageArgs ...interface{}) error {
+func Wrap(ctx context.Context, err error, code string, message ...interface{}) error {
+	if err == nil {
+		return nil
+	}
+	var e CtxErr = &impl{
+		ctx:     OnNew(ctx, code),
+		msg:     fmt.Sprint(message...),
+		wrapped: err,
+	}
+	if code == "" {
+		return OnEmptyCode(e)
+	}
+	return e
+}
+
+// Wrapf creates a new error with a formatted message with another wrapped under it
+func Wrapf(ctx context.Context, err error, code, message string, messageArgs ...interface{}) error {
 	if err == nil {
 		return nil
 	}
