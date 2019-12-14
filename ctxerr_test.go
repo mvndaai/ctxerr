@@ -20,7 +20,10 @@ func TestFields(t *testing.T) {
 	ctx = ctxerr.SetField(ctx, fk, "baz")
 	ctx = ctxerr.SetField(ctx, fk, fv)
 
-	f := ctxerr.AllFields(ctxerr.New(ctx, "1c678a4a-305f-4f68-880f-f459009e42ee", "msg"))
+	err := ctxerr.New(ctx, "1c678a4a-305f-4f68-880f-f459009e42ee", "msg")
+	err = ctxerr.Wrap(ctx, err, "e6027c14-cef9-453e-965e-ff16587fecf6", "wrapper")
+
+	f := ctxerr.AllFields(err)
 	for k, v := range f {
 		if k == fk {
 			if v != fv {
@@ -556,4 +559,34 @@ func TestAllFields(t *testing.T) {
 	if b != "b" {
 		t.Error("b value did not match", b)
 	}
+}
+
+func TestNilLogHandle(t *testing.T) {
+	o := ctxerr.LogError
+	defer func() {
+		ctxerr.LogError = o
+	}()
+	ctxerr.LogError = nil
+
+	ctxerr.DefaultHandler(errors.New("tmp"))
+}
+
+func TestAs(t *testing.T) {
+	tests := []struct {
+		in  error
+		out bool
+	}{
+		{in: nil, out: false},
+		{in: errors.New("errors"), out: false},
+		{in: ctxerr.New(context.Background(), "-", "ctxerr"), out: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintln(tt.in), func(t *testing.T) {
+			if _, b := ctxerr.As(tt.in); b != tt.out {
+				t.Error("bool did not match")
+			}
+		})
+	}
+
 }

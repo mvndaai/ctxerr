@@ -296,6 +296,9 @@ func DefaultHandler(err error) {
 			logger = LogWarn
 		}
 	}
+	if logger == nil {
+		logger = DefaultLog("error")
+	}
 	logger(err)
 }
 
@@ -337,10 +340,9 @@ func HasCategory(err error, category interface{}) bool {
 		return false
 	}
 	var e CtxErr = &impl{}
-	if ok := xerrors.Is(err, e); !ok {
+	if !xerrors.As(err, &e) {
 		return false
 	}
-	xerrors.As(err, &e)
 	for {
 		if c, ok := e.Fields()[FieldKeyCategory]; ok {
 			if c == category {
@@ -348,8 +350,7 @@ func HasCategory(err error, category interface{}) bool {
 			}
 		}
 		u := xerrors.Unwrap(e)
-		if ok := xerrors.Is(u, e); ok {
-			xerrors.As(u, &e)
+		if xerrors.As(u, &e) {
 			continue
 		}
 		break
