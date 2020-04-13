@@ -14,10 +14,7 @@ A quick wrap function is available to avoid needing to create unused codes and m
 This function calls Wrap with an empty string for the code and calls "ctxerr.CallerFunc(1)" for the message.
 	ctxerr.QuickWrap(ctx, err)
 
-Note: Wrapping nil will return nil. This enables returning wraps extra error checking.
-
-Note: If an empty string is passed as the code, the OnEmptyCode function will be called.
-The default behavior is to log a warning.
+Note: Wrapping nil will return nil.
 
 
 Context
@@ -37,30 +34,13 @@ Using this for goroutines ensures all the data gets propagated.
 	go foo(nctx)
 
 
-Logging
-
-Log functions with different severities are provided to ensure all errors all logged the same way.
-By default, the functions call 'log.Println' with the fields as a marshaled JSON object in addition to the message chain.
-The functions are public vars so they can be replaced for any logging setup.
-	ctxerr.LogDebug = func(err error) { customLogFunc(err) }
-	ctxerr.LogDebug(err)
-	ctxerr.LogError(err)
-
-
-Configurable Functions
-
-The configurable functions (OnNew, Handle, and OnEmptyCode) are public vars so they can be customized.
-
-OnNew is automatically called on a New or Wrap. Replace it to add custom fields on creation.
-The default is to add the code as a field on the context.
-
-OnEmptyCode is automatically called when creating an error that has a code of an empty string.
-The default behavior is to unwrap the error looking for a previous code.
-If one does not exist an error will be logged.
+Handle
 
 Handle exists to make sure all errors are handled in the say way.
-The default behavior is to log the error.
 It should be called only once at the top of all wrapped errors.
+It will run through all hooks added through configuration or fallback to the DefaultLogHook.
+
+
 (i.e. HTTP handle functions or goroutines)
 	nctx := ctxerr.SetFields(context.Background(), ctxerr.Fields(ctx))
 	go func(ctx context.Context){
@@ -70,13 +50,26 @@ It should be called only once at the top of all wrapped errors.
 		}
 	}(nctx)
 
+
+Configuration
+
+Configuration hooks can be used to exit the context before creating the error and to handle the error.
+
+If you need the context to change prior to creation of the error use 'AddCreateHook'.
+
+To change how errors are handled use 'AddHandleHook'.
+Note: If you are not adding a custom logging hook it may be useful to add the default.
+	AddHandleHook(metricOnError)
+	AddHandleHook(DefaultLogHook)
+
+
 HTTP
 
 There is an http subpackage for handling HTTP errors.
 The function included returns a standardized struct filled in with details of the error.
 There are fields key constansts to help with this.
-	ctx = ctxerr.SetField(ctx, ctxerr.FieldStatusCode, 400)
-	ctx = ctxerr.SetField(ctx, ctxerr.FieldKeyAction, "action for an outside user")
+	ctx = ctxerr.SetHTTPStatusCode(ctx, http.StatusBadRequest)
+	ctx = ctxerr.SetAction(ctx, "action for a user to understand how to fix the error if they can")
 */
 package ctxerr
 
@@ -87,10 +80,17 @@ import (
 	"log"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"golang.org/x/xerrors"
 )
+
+func init() {
+	// Always add the code to the fields
+	AddCreateHook(setCodeHook)
+}
+
+var createHooks []func(ctx context.Context, code string, wrapping error) context.Context
+var handleHooks []func(error)
 
 const (
 	// FieldKeyCode should be unique to the error
@@ -101,39 +101,39 @@ const (
 	FieldKeyAction = "error_action"
 	//FieldKeyCategory can be used with IsCategorgy(...) to determin a category of error
 	FieldKeyCategory = "error_category"
-	// FieldKeyRelatedCode can be used when there is a second error but want the original code in the logs
-	FieldKeyRelatedCode = "error_related_code"
-
-	// fieldKeyLogSeverity is the log severity
-	fieldKeyLogSeverity = "error_severity"
-	//fieldKeyFunctionName is the name a of function added to logging of Quickwraps
-	fieldKeyFunctionName = "error_function_name"
 )
 
-// Customizations for the package
-var (
-	// OnNew is called when an error is created by New, Wrap, or QuickWrap
-	OnNew = DefaultOnNew
-	// OnEmptyCode is called when an error is created with an empty string for a code
-	OnEmptyCode = DefaultOnEmptyCode
-	// Handle should be called when handling an error
-	Handle = DefaultHandler
+// FieldsKey is the key used to add and decode fields on the context
+// Change or use it in other packages if you want to unify fields
+var FieldsKey interface{} = contextKey("fields")
 
-	//FieldsKey is the key used to add and decode fields on the context
-	FieldsKey interface{} = contextKey("fields")
-)
+// Handle should be called one per error to handle it when it can no logger be returned
+func Handle(err error) {
+	if err == nil {
+		return
+	}
 
-// Configurable logging methods
-var (
-	LogDebug = DefaultLog("debug")
-	LogInfo  = DefaultLog("info")
-	LogWarn  = DefaultLog("warn")
-	LogError = DefaultLog("error")
-	LogFatal = DefaultLog("fatal")
-)
+	if len(handleHooks) == 0 {
+		DefaultLogHook(err)
+		return
+	}
+
+	for _, hook := range handleHooks {
+		hook(err)
+	}
+}
+
+// AddCreateHook adds a hooks that is called to update the context before the error is created
+func AddCreateHook(f func(ctx context.Context, code string, wrapping error) context.Context) {
+	createHooks = append(createHooks, f)
+}
+
+// AddHandleHook adds a hook to be run on handling of an error
+func AddHandleHook(f func(error)) {
+	handleHooks = append(handleHooks, f)
+}
 
 // CtxErr is the interface that should be checked in a xerrors As function
-// TODO revisit this comment
 type CtxErr interface {
 	error
 	xerrors.Wrapper
@@ -147,26 +147,26 @@ type CtxErr interface {
 
 // New creates a new error
 func New(ctx context.Context, code string, message ...interface{}) error {
-	var e CtxErr = &impl{
-		ctx: OnNew(ctx, code),
+	for _, hook := range createHooks {
+		ctx = hook(ctx, code, nil)
+	}
+
+	return &impl{
+		ctx: ctx,
 		msg: fmt.Sprint(message...),
 	}
-	if code == "" {
-		return OnEmptyCode(e)
-	}
-	return e
 }
 
 // Newf creates a new error message formatting
 func Newf(ctx context.Context, code, message string, messageArgs ...interface{}) error {
-	var e CtxErr = &impl{
-		ctx: OnNew(ctx, code),
+	for _, hook := range createHooks {
+		ctx = hook(ctx, code, nil)
+	}
+
+	return &impl{
+		ctx: ctx,
 		msg: fmt.Sprintf(message, messageArgs...),
 	}
-	if code == "" {
-		return OnEmptyCode(e)
-	}
-	return e
 }
 
 // Wrap creates a new error with another wrapped under it
@@ -174,15 +174,16 @@ func Wrap(ctx context.Context, err error, code string, message ...interface{}) e
 	if err == nil {
 		return nil
 	}
-	var e CtxErr = &impl{
-		ctx:     OnNew(ctx, code),
+
+	for _, hook := range createHooks {
+		ctx = hook(ctx, code, err)
+	}
+
+	return &impl{
+		ctx:     ctx,
 		msg:     fmt.Sprint(message...),
 		wrapped: err,
 	}
-	if code == "" {
-		return OnEmptyCode(e)
-	}
-	return e
 }
 
 // Wrapf creates a new error with a formatted message with another wrapped under it
@@ -190,15 +191,16 @@ func Wrapf(ctx context.Context, err error, code, message string, messageArgs ...
 	if err == nil {
 		return nil
 	}
-	var e CtxErr = &impl{
-		ctx:     OnNew(ctx, code),
+
+	for _, hook := range createHooks {
+		ctx = hook(ctx, code, err)
+	}
+
+	return &impl{
+		ctx:     ctx,
 		msg:     fmt.Sprintf(message, messageArgs...),
 		wrapped: err,
 	}
-	if code == "" {
-		return OnEmptyCode(e)
-	}
-	return e
 }
 
 // QuickWrap will wrap an error with an empty code and the calling function's name as the message
@@ -248,58 +250,6 @@ func CallerFunc(skip int) string {
 		}
 	}
 	return "caller location unretrievable"
-}
-
-// DefaultOnNew is the default OnNew function called when creating errors
-func DefaultOnNew(ctx context.Context, code string) context.Context {
-	if code != "" {
-		ctx = SetField(ctx, FieldKeyCode, code)
-	}
-	return ctx
-}
-
-// DefaultOnEmptyCode is the default way to handle errors what have an empty string as their code
-func DefaultOnEmptyCode(err CtxErr) CtxErr {
-	var current error = err
-	var i CtxErr = &impl{}
-	for {
-		if ok := xerrors.As(current, &i); !ok {
-			break
-		}
-		f := i.Fields()
-		if f != nil {
-			if _, ok := f[FieldKeyCode]; ok {
-				return err
-			}
-		}
-		current = xerrors.Unwrap(current)
-	}
-
-	LogWarn(&impl{
-		ctx:     context.Background(),
-		msg:     "did not find a code within the error's stack",
-		wrapped: err,
-	})
-
-	err.WithContext(SetField(err.Context(), FieldKeyCode, "no_code"))
-	return err
-}
-
-// DefaultHandler is the default way of handling an error, logging with the fields
-func DefaultHandler(err error) {
-	if err == nil {
-		return
-	}
-	logger := LogError
-	if v, ok := AllFields(err)[FieldKeyStatusCode]; ok {
-		if strings.HasPrefix(fmt.Sprint(v), "4") {
-			logger = LogWarn
-		}
-	}
-	if logger == nil {
-		logger = DefaultLog("error")
-	}
-	logger(err)
 }
 
 // AllFields unwraps the error collecting/replacing fields as it goes down the tree
@@ -397,17 +347,40 @@ func (im *impl) Fields() map[string]interface{} { return Fields(im.ctx) }
 // WithContext replaces the context of the error
 func (im *impl) WithContext(ctx context.Context) { im.ctx = ctx }
 
-// DefaultLog is the default logging function
-func DefaultLog(severity string) func(error) {
-	return func(err error) {
-		f := AllFields(err)
-		f[fieldKeyLogSeverity] = severity
+// ** Helper Functions ** //
 
-		b, merr := json.Marshal(f)
-		fields := string(b)
-		if merr != nil {
-			fields = fmt.Sprintf("fields '%v' could not be marshalled as JSON: %s", f, merr)
-		}
-		log.Printf("%s - %s", err, fields)
+// SetHTTPStatusCode is equivelent to ctxerr.SetField(ctx, FieldKeyStatusCode, code)
+func SetHTTPStatusCode(ctx context.Context, code int) context.Context {
+	return SetField(ctx, FieldKeyStatusCode, code)
+}
+
+// SetAction is equivelent to ctxerr.SetField(ctx, FieldKeyAction, action)
+func SetAction(ctx context.Context, action string) context.Context {
+	return SetField(ctx, FieldKeyAction, action)
+}
+
+// SetCategory is equivelent to ctxerr.SetField(ctx, FieldKeyStatusCode, category)
+func SetCategory(ctx context.Context, category interface{}) context.Context {
+	return SetField(ctx, FieldKeyCategory, category)
+}
+
+// ** Hooks ** //
+
+// DefaultLogHook is the default hook used log errors
+// It is the fallback if there are no other handle hooks
+func DefaultLogHook(err error) {
+	f := AllFields(err)
+	b, merr := json.Marshal(f)
+	fields := string(b)
+	if merr != nil {
+		fields = fmt.Sprintf("fields '%v' could not be marshalled as JSON: %s", f, merr)
 	}
+	log.Printf("%s - %s", err, fields)
+}
+
+func setCodeHook(ctx context.Context, code string, wrapping error) context.Context {
+	if code != "" {
+		ctx = SetField(ctx, FieldKeyCode, code)
+	}
+	return ctx
 }

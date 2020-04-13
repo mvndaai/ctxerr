@@ -1,4 +1,4 @@
-package ctxerr_test
+package ctxerr
 
 import (
 	"context"
@@ -7,8 +7,6 @@ import (
 	"log"
 	"strings"
 	"testing"
-
-	"github.com/mvndaai/ctxerr"
 )
 
 func TestFields(t *testing.T) {
@@ -16,14 +14,14 @@ func TestFields(t *testing.T) {
 	fv := "final value"
 
 	ctx := context.Background()
-	ctx = ctxerr.SetField(ctx, "foo", "bar")
-	ctx = ctxerr.SetField(ctx, fk, "baz")
-	ctx = ctxerr.SetField(ctx, fk, fv)
+	ctx = SetField(ctx, "foo", "bar")
+	ctx = SetField(ctx, fk, "baz")
+	ctx = SetField(ctx, fk, fv)
 
-	err := ctxerr.New(ctx, "1c678a4a-305f-4f68-880f-f459009e42ee", "msg")
-	err = ctxerr.Wrap(ctx, err, "e6027c14-cef9-453e-965e-ff16587fecf6", "wrapper")
+	err := New(ctx, "1c678a4a-305f-4f68-880f-f459009e42ee", "msg")
+	err = Wrap(ctx, err, "e6027c14-cef9-453e-965e-ff16587fecf6", "wrapper")
 
-	f := ctxerr.AllFields(err)
+	f := AllFields(err)
 	for k, v := range f {
 		if k == fk {
 			if v != fv {
@@ -38,29 +36,13 @@ func TestFields(t *testing.T) {
 }
 
 func TestNil(t *testing.T) {
-	err := ctxerr.Wrap(context.Background(), nil, "", "")
+	err := Wrap(context.Background(), nil, "", "")
 	if err != nil {
 		t.Error("error should have been nil")
 	}
 }
 
-func TestDeepestErr(t *testing.T) {
-	tests := []struct {
-		name  string
-		err   error
-		isErr bool
-	}{
-		{},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			//TODO
-		})
-	}
-}
-
-func TestIntegrations(t *testing.T) {
+func TestOverall(t *testing.T) {
 	code := "code"
 	tests := []struct {
 		name  string
@@ -68,13 +50,12 @@ func TestIntegrations(t *testing.T) {
 
 		expectedMessage string
 		expectedFields  map[string]interface{}
-		expectedWarn    bool
+		expectedNil     bool
 	}{
 		{
-			name:            "nil",
-			toErr:           func(ctx context.Context) error { return nil },
-			expectedMessage: "<nil>",
-			expectedFields:  nil,
+			name:        "nil",
+			toErr:       func(ctx context.Context) error { return nil },
+			expectedNil: true,
 		},
 		{
 			name:            "errors",
@@ -85,138 +66,119 @@ func TestIntegrations(t *testing.T) {
 		{
 			name: "new",
 			toErr: func(ctx context.Context) error {
-				return ctxerr.New(ctx, code, "", "new")
+				return New(ctx, code, "", "new")
 			},
 			expectedMessage: "new",
-			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code},
+			expectedFields:  map[string]interface{}{FieldKeyCode: code},
 		},
 		{
 			name: "newf",
 			toErr: func(ctx context.Context) error {
-				return ctxerr.Newf(ctx, code, "%s", "newf")
+				return Newf(ctx, code, "%s", "newf")
 			},
 			expectedMessage: "newf",
-			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code},
+			expectedFields:  map[string]interface{}{FieldKeyCode: code},
 		},
 		{
 			name: "action",
 			toErr: func(ctx context.Context) error {
-				ctx = ctxerr.SetField(ctx, ctxerr.FieldKeyAction, "action")
-				return ctxerr.New(ctx, code, "action")
+				ctx = SetField(ctx, FieldKeyAction, "action")
+				return New(ctx, code, "action")
 			},
 			expectedMessage: "action",
 			expectedFields: map[string]interface{}{
-				ctxerr.FieldKeyCode:   code,
-				ctxerr.FieldKeyAction: "action",
+				FieldKeyCode:   code,
+				FieldKeyAction: "action",
 			},
 		},
 		{
 			name: "wrap",
 			toErr: func(ctx context.Context) error {
-				return ctxerr.Wrap(ctx, errors.New("wrapped"), code, "", "wrap")
+				return Wrap(ctx, errors.New("wrapped"), code, "", "wrap")
 			},
 			expectedMessage: "wrap : wrapped",
-			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code},
+			expectedFields:  map[string]interface{}{FieldKeyCode: code},
 		},
 		{
 			name: "wrapf",
 			toErr: func(ctx context.Context) error {
-				return ctxerr.Wrapf(ctx, errors.New("wrapped"), code, "%s", "wrapf")
+				return Wrapf(ctx, errors.New("wrapped"), code, "%s", "wrapf")
 			},
 			expectedMessage: "wrapf : wrapped",
-			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code},
+			expectedFields:  map[string]interface{}{FieldKeyCode: code},
 		},
 		{
 			name: "nil wrap",
 			toErr: func(ctx context.Context) error {
-				return ctxerr.Wrap(ctx, nil, code, "nil wrap")
+				return Wrap(ctx, nil, code, "nil wrap")
 			},
-			expectedMessage: "<nil>",
-			expectedFields:  map[string]interface{}{},
+			expectedNil: true,
 		},
 		{
 			name: "nil wrapf",
 			toErr: func(ctx context.Context) error {
-				return ctxerr.Wrapf(ctx, nil, code, "nil wrap")
+				return Wrapf(ctx, nil, code, "nil wrap")
 			},
-			expectedMessage: "<nil>",
-			expectedFields:  map[string]interface{}{},
+			expectedNil: true,
 		},
 		{
 			name: "with fields",
 			toErr: func(ctx context.Context) error {
-				ctx = ctxerr.SetFields(ctx, map[string]interface{}{"foo": "bar"})
-				return ctxerr.New(ctx, code, "with fields")
+				ctx = SetFields(ctx, map[string]interface{}{"foo": "bar"})
+				return New(ctx, code, "with fields")
 			},
 			expectedMessage: "with fields",
-			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code, "foo": "bar"},
+			expectedFields:  map[string]interface{}{FieldKeyCode: code, "foo": "bar"},
 		},
 		{
 			name: "new no code",
 			toErr: func(ctx context.Context) error {
-				return ctxerr.New(ctx, "", "new no code")
+				return New(ctx, "", "new no code")
 			},
 			expectedMessage: "new no code",
-			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: "no_code"},
-			expectedWarn:    true,
+			expectedFields:  map[string]interface{}{},
 		},
 		{
 			name: "newf no code",
 			toErr: func(ctx context.Context) error {
-				return ctxerr.Newf(ctx, "", "new no code")
+				return Newf(ctx, "", "new no code")
 			},
 			expectedMessage: "new no code",
-			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: "no_code"},
-			expectedWarn:    true,
+			expectedFields:  map[string]interface{}{},
 		},
 		{
 			name: "wrapf no code",
 			toErr: func(ctx context.Context) error {
-				return ctxerr.Wrapf(ctx, errors.New("error"), "", "wrapf no code")
+				return Wrapf(ctx, errors.New("error"), "", "wrapf no code")
 			},
 			expectedMessage: "wrapf no code : error",
-			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: "no_code"},
-			expectedWarn:    true,
+			expectedFields:  map[string]interface{}{},
 		},
 	}
 
-	var logMessage string
-	var logFields map[string]interface{}
-	ctxerr.LogError = func(err error) {
-		logMessage = fmt.Sprint(err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 
-		if ce, ok := err.(ctxerr.CtxErr); ok {
-			logFields = ce.Fields()
-		}
-	}
-
-	var warning bool
-	ctxerr.LogWarn = func(err error) { warning = true }
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			warning = false
-			logMessage = "<nil>"
-			logFields = map[string]interface{}{}
-
-			ctxerr.LogError(test.toErr(context.Background()))
-
-			if logMessage != test.expectedMessage {
-				t.Errorf("Message did not match log message:\n%s\n%s", logMessage, test.expectedMessage)
-			}
-
-			if len(test.expectedFields) != len(logFields) {
-				t.Errorf("Fields count did not match:\n%s\n%s", logFields, test.expectedFields)
-
-			}
-			for k, v := range test.expectedFields {
-				if fv := logFields[k]; fv != v {
-					t.Error("field did not match", fv, k)
+			err := tt.toErr(context.Background())
+			if err != nil {
+				if m := err.Error(); m != tt.expectedMessage {
+					t.Errorf("Message did not match log message:\n%s\n%s", m, tt.expectedMessage)
 				}
 			}
 
-			if warning != test.expectedWarn {
-				t.Error("Warning did not match")
+			if (err != nil) == tt.expectedNil {
+				t.Error("Nil matched failed")
+			}
+
+			logFields := AllFields(err)
+			if len(tt.expectedFields) != len(logFields) {
+				t.Errorf("Fields count did not match:\n%s\n%s", logFields, tt.expectedFields)
+
+			}
+			for k, v := range tt.expectedFields {
+				if fv := logFields[k]; fv != v {
+					t.Error("field did not match", fv, k)
+				}
 			}
 		})
 
@@ -228,55 +190,45 @@ func TestQuickWrap(t *testing.T) {
 		name string
 		err  func(context.Context) error
 
-		expectedWarnings int
-		expectedMessage  string
-		expectedCode     string
+		expectedMessage string
+		expectedCode    interface{}
 	}{
 		{
-			name:             "external",
-			err:              func(ctx context.Context) error { return ctxerr.QuickWrap(ctx, errors.New("external")) },
-			expectedMessage:  "ctxerr_test.TestQuickWrap.func1 : external",
-			expectedWarnings: 1,
-			expectedCode:     "no_code",
+			name:            "external",
+			err:             func(ctx context.Context) error { return QuickWrap(ctx, errors.New("external")) },
+			expectedMessage: "ctxerr.TestQuickWrap.func1 : external",
+			expectedCode:    nil,
 		},
 		{
 			name: "ctxerr",
 			err: func(ctx context.Context) error {
-				return ctxerr.QuickWrap(ctx, ctxerr.New(ctx, "code", "ctxerr"))
+				return QuickWrap(ctx, New(ctx, "code", "ctxerr"))
 			},
-			expectedMessage:  "ctxerr_test.TestQuickWrap.func2 : ctxerr",
-			expectedWarnings: 0,
-			expectedCode:     "code",
+			expectedMessage: "ctxerr.TestQuickWrap.func2 : ctxerr",
+			expectedCode:    "code",
 		},
 		{
 			name: "triple wrap",
 			err: func(ctx context.Context) error {
 				err := errors.New("double wrap")
-				err = ctxerr.QuickWrap(ctx, err)
-				err = ctxerr.QuickWrap(ctx, err)
-				return ctxerr.QuickWrap(ctx, err)
+				err = QuickWrap(ctx, err)
+				err = QuickWrap(ctx, err)
+				return QuickWrap(ctx, err)
 			},
-			expectedMessage:  "ctxerr_test.TestQuickWrap.func3 : ctxerr_test.TestQuickWrap.func3 : ctxerr_test.TestQuickWrap.func3 : double wrap",
-			expectedWarnings: 1,
-			expectedCode:     "no_code",
+			expectedMessage: "ctxerr.TestQuickWrap.func3 : ctxerr.TestQuickWrap.func3 : ctxerr.TestQuickWrap.func3 : double wrap",
+			expectedCode:    nil,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			warnings := 0
-			ctxerr.LogWarn = func(err error) { warnings++ }
 			err := test.err(context.Background())
 
 			if es := fmt.Sprint(err); es != test.expectedMessage {
 				t.Errorf("Message did not match \n%s\n%s ", es, test.expectedMessage)
 			}
 
-			if warnings != test.expectedWarnings {
-				t.Error("Warning did not match")
-			}
-
-			code := ctxerr.AllFields(err)[ctxerr.FieldKeyCode]
+			code := AllFields(err)[FieldKeyCode]
 			if code != test.expectedCode {
 				t.Error("Code did not match", code, test.expectedCode)
 			}
@@ -284,128 +236,18 @@ func TestQuickWrap(t *testing.T) {
 	}
 }
 
-func TestDefaultHandle(t *testing.T) {
-
-	tests := []struct {
-		name          string
-		err           error
-		expectedWarn  bool
-		expectedError bool
-	}{
-		{
-			name:          "nil",
-			err:           nil,
-			expectedWarn:  false,
-			expectedError: false,
-		},
-		{
-			name:          "go error",
-			err:           errors.New(""),
-			expectedWarn:  false,
-			expectedError: true,
-		},
-		{
-			name:          "ctxerr",
-			err:           ctxerr.New(context.Background(), "foo", "bar"),
-			expectedWarn:  false,
-			expectedError: true,
-		},
-		{
-			name: "status code 503",
-			err: func() error {
-				ctx := ctxerr.SetField(context.Background(), ctxerr.FieldKeyStatusCode, 500)
-				return ctxerr.New(ctx, "foo", "bar")
-			}(),
-			expectedWarn:  false,
-			expectedError: true,
-		},
-		{
-			name: "status code string 400",
-			err: func() error {
-				ctx := ctxerr.SetField(context.Background(), ctxerr.FieldKeyStatusCode, "400")
-				return ctxerr.New(ctx, "foo", "bar")
-			}(),
-			expectedWarn:  true,
-			expectedError: false,
-		},
-		{
-			name: "status code string foo",
-			err: func() error {
-				ctx := ctxerr.SetField(context.Background(), ctxerr.FieldKeyStatusCode, "foo")
-				return ctxerr.New(ctx, "foo", "bar")
-			}(),
-			expectedWarn:  false,
-			expectedError: true,
-		},
-		{
-			name: "status code 400",
-			err: func() error {
-				ctx := ctxerr.SetField(context.Background(), ctxerr.FieldKeyStatusCode, 400)
-				return ctxerr.New(ctx, "foo", "bar")
-			}(),
-			expectedWarn:  true,
-			expectedError: false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			logError := false
-			ctxerr.LogError = func(err error) { logError = true }
-
-			logWarn := false
-			ctxerr.LogWarn = func(err error) { logWarn = true }
-
-			ctxerr.DefaultHandler(test.err)
-
-			if logError != test.expectedError {
-				t.Error("Log severity 'error' did not match")
-			}
-			if logWarn != test.expectedWarn {
-				t.Error("Log severity 'warn' did not match")
-			}
-		})
-	}
-}
-
-func TestDefaultLog(t *testing.T) {
-	severity := "sev"
-	message := "message"
-	code := "code"
-	err := ctxerr.New(context.Background(), code, message)
-
-	sb := &strings.Builder{}
-	log.SetOutput(sb)
-
-	lf := ctxerr.DefaultLog(severity)
-	lf(err)
-
-	out := strings.TrimSpace(sb.String())
-	log := strings.SplitAfterN(out, " ", 3)[2]
-
-	expectedLog := fmt.Sprintf(`%s - {"%s":"%s","%s":"%s"}`,
-		message,
-		ctxerr.FieldKeyCode, code,
-		"error_severity", severity,
-	)
-
-	if log != expectedLog {
-		t.Errorf("Logs did not match\n%s\n%s", log, expectedLog)
-	}
-}
-
 func TestCallerFunc(t *testing.T) {
-	cf := ctxerr.CallerFunc(0)
-	expected := "ctxerr_test.TestCallerFunc"
+	cf := CallerFunc(0)
+	expected := "ctxerr.TestCallerFunc"
 
 	if cf != expected {
 		t.Error("Did not match expected", cf, expected)
 	}
 
 	acf := func() string {
-		return ctxerr.CallerFunc(0)
+		return CallerFunc(0)
 	}()
-	anonExpected := "ctxerr_test.TestCallerFunc.func1"
+	anonExpected := "ctxerr.TestCallerFunc.func1"
 
 	if acf != anonExpected {
 		t.Error("Anonymous func not match expected", acf, anonExpected)
@@ -413,13 +255,12 @@ func TestCallerFunc(t *testing.T) {
 }
 
 func TestDefaultLogNonJSONFields(t *testing.T) {
-	ctxerr.OnEmptyCode = func(err ctxerr.CtxErr) ctxerr.CtxErr { return err }
-	ctx := ctxerr.SetField(context.Background(), "foo", func() {})
-	err := ctxerr.New(ctx, "", "")
+	ctx := SetField(context.Background(), "foo", func() {})
+	err := New(ctx, "", "")
 
 	sb := &strings.Builder{}
 	log.SetOutput(sb)
-	ctxerr.DefaultLog("")(err)
+	DefaultLogHook(err)
 
 	out := strings.TrimSpace(sb.String())
 	log := strings.SplitAfter(out, "json: ")[1]
@@ -442,7 +283,7 @@ func TestCategory(t *testing.T) {
 			match:    false,
 			category: nil,
 			toErr: func(ctx context.Context) error {
-				return ctxerr.New(ctx, "code", "msg")
+				return New(ctx, "code", "msg")
 			},
 		},
 		{
@@ -456,7 +297,7 @@ func TestCategory(t *testing.T) {
 			match:    true,
 			category: "str",
 			toErr: func(ctx context.Context) error {
-				return ctxerr.New(ctx, "code", "msg")
+				return New(ctx, "code", "msg")
 			},
 		},
 		{
@@ -464,7 +305,7 @@ func TestCategory(t *testing.T) {
 			match:    true,
 			category: 10,
 			toErr: func(ctx context.Context) error {
-				return ctxerr.New(ctx, "code", "msg")
+				return New(ctx, "code", "msg")
 			},
 		},
 		{
@@ -472,7 +313,7 @@ func TestCategory(t *testing.T) {
 			match:    true,
 			category: "str",
 			toErr: func(ctx context.Context) error {
-				return ctxerr.Wrap(ctx, errors.New(""), "code", "msg")
+				return Wrap(ctx, errors.New(""), "code", "msg")
 			},
 		},
 		{
@@ -480,8 +321,8 @@ func TestCategory(t *testing.T) {
 			match:    true,
 			category: "str",
 			toErr: func(ctx context.Context) error {
-				err := ctxerr.New(ctx, "code", "msg")
-				return ctxerr.QuickWrap(context.Background(), err)
+				err := New(ctx, "code", "msg")
+				return QuickWrap(context.Background(), err)
 			},
 		},
 		{
@@ -496,11 +337,11 @@ func TestCategory(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
 			if test.category != nil {
-				ctx = ctxerr.SetField(ctx, ctxerr.FieldKeyCategory, test.category)
+				ctx = SetField(ctx, FieldKeyCategory, test.category)
 			}
 
 			err := test.toErr(ctx)
-			ic := ctxerr.HasCategory(err, test.category)
+			ic := HasCategory(err, test.category)
 			if ic != test.match {
 				t.Error("Category match was unexpected")
 			}
@@ -524,42 +365,42 @@ func TestAddingToContext(t *testing.T) {
 
 	cctx := context.Background()
 	dMapKey, dMapValue := "d", "d"
-	dctx := ctxerr.SetField(cctx, dMapKey, dMapValue)
+	dctx := SetField(cctx, dMapKey, dMapValue)
 	eMapKey, eMapValue := "e", "e"
-	ectx := ctxerr.SetField(dctx, eMapKey, eMapValue)
+	ectx := SetField(dctx, eMapKey, eMapValue)
 
-	if f := ctxerr.Fields(cctx); len(f) != 0 {
+	if f := Fields(cctx); len(f) != 0 {
 		t.Error("cctx had an incorrect amount of fields", f)
 	}
-	if f := ctxerr.Fields(dctx); len(f) != 1 {
+	if f := Fields(dctx); len(f) != 1 {
 		t.Error("dctx had an incorrect amount of fields", f)
 	}
-	if f := ctxerr.Fields(ectx); len(f) != 2 {
+	if f := Fields(ectx); len(f) != 2 {
 		t.Error("ectx had an incorrect amount of fields", f)
 	}
 
-	fctx := ctxerr.SetFields(ectx, map[string]interface{}{"f": "f", "g": "g"})
-	if f := ctxerr.Fields(fctx); len(f) != 4 {
+	fctx := SetFields(ectx, map[string]interface{}{"f": "f", "g": "g"})
+	if f := Fields(fctx); len(f) != 4 {
 		t.Error("fctx had an incorrect amount of fields", f)
 	}
 }
 
 func TestAllFields(t *testing.T) {
-	if f := ctxerr.AllFields(nil); f == nil {
+	if f := AllFields(nil); f == nil {
 		t.Error("fields shouldn't have been nil")
 	}
-	if f := ctxerr.AllFields(errors.New("a")); len(f) != 0 {
+	if f := AllFields(errors.New("a")); len(f) != 0 {
 		t.Error("fields without a context should have no values")
 	}
 
 	ctx := context.Background()
-	ctx = ctxerr.SetField(ctx, "a", "a")
-	err := ctxerr.New(ctx, "a", "a")
+	ctx = SetField(ctx, "a", "a")
+	err := New(ctx, "a", "a")
 
-	ctx = ctxerr.SetField(ctx, "b", "b")
-	err = ctxerr.QuickWrap(ctx, err)
+	ctx = SetField(ctx, "b", "b")
+	err = QuickWrap(ctx, err)
 
-	fields := ctxerr.AllFields(err)
+	fields := AllFields(err)
 	b, ok := fields["b"]
 	if !ok {
 		t.Fatal("b was not found in fields")
@@ -569,16 +410,6 @@ func TestAllFields(t *testing.T) {
 	}
 }
 
-func TestNilLogHandle(t *testing.T) {
-	o := ctxerr.LogError
-	defer func() {
-		ctxerr.LogError = o
-	}()
-	ctxerr.LogError = nil
-
-	ctxerr.DefaultHandler(errors.New("tmp"))
-}
-
 func TestAs(t *testing.T) {
 	tests := []struct {
 		in  error
@@ -586,15 +417,80 @@ func TestAs(t *testing.T) {
 	}{
 		{in: nil, out: false},
 		{in: errors.New("errors"), out: false},
-		{in: ctxerr.New(context.Background(), "-", "ctxerr"), out: true},
+		{in: New(context.Background(), "-", "ctxerr"), out: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintln(tt.in), func(t *testing.T) {
-			if _, b := ctxerr.As(tt.in); b != tt.out {
+			if _, b := As(tt.in); b != tt.out {
 				t.Error("bool did not match")
 			}
 		})
+	}
+
+}
+
+func TestFallbackHandle(t *testing.T) {
+	tests := []struct {
+		name        string
+		HandleHooks []func(error)
+		expectedLog bool
+	}{
+		{name: "fallback",
+			HandleHooks: nil,
+			expectedLog: true,
+		},
+		{name: "normal",
+			HandleHooks: []func(error){func(error) {}},
+			expectedLog: false,
+		},
+	}
+
+	err := New(context.Background(), "", "msg")
+	sb := &strings.Builder{}
+	log.SetOutput(sb)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sb.Reset()
+			handleHooks = tt.HandleHooks
+			Handle(err)
+
+			msg := sb.String()
+			if (len(sb.String()) == 0) == tt.expectedLog {
+				t.Error("expectedLog did not match:", msg)
+			}
+		})
+	}
+}
+
+func TestCustomizations(t *testing.T) {
+	var createHookRan bool
+	var handleHookRan bool
+
+	AddCreateHook(func(ctx context.Context, _ string, _ error) context.Context {
+		createHookRan = true
+		return ctx
+	})
+
+	AddHandleHook(func(_ error) {
+		handleHookRan = true
+	})
+
+	if createHookRan {
+		t.Error("create hook should not have run yet")
+	}
+	err := New(context.Background(), "", "")
+	if !createHookRan {
+		t.Error("did not run create hook")
+	}
+
+	if handleHookRan {
+		t.Error("handle hook should not have run yet")
+	}
+	Handle(err)
+	if !handleHookRan {
+		t.Error("did not run handle hook")
 	}
 
 }

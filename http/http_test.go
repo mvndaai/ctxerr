@@ -108,7 +108,6 @@ func TestStatusCodeAndResponse(t *testing.T) {
 
 			expectedStatusCode: 500,
 			expectedCode:       happyCode,
-			expectedWarnings:   true,
 		},
 		{
 			name: "status code typed int",
@@ -119,7 +118,6 @@ func TestStatusCodeAndResponse(t *testing.T) {
 
 			expectedStatusCode: 400,
 			expectedCode:       happyCode,
-			expectedWarnings:   false,
 		},
 		{
 			name: "status code other",
@@ -130,15 +128,11 @@ func TestStatusCodeAndResponse(t *testing.T) {
 
 			expectedStatusCode: 500,
 			expectedCode:       happyCode,
-			expectedWarnings:   true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			warnings := false
-			ctxerr.LogWarn = func(err error) { warnings = true }
-
 			sc, r := http.StatusCodeAndResponse(test.err, test.showMessage, test.showFields)
 
 			if sc != test.expectedStatusCode {
@@ -156,9 +150,6 @@ func TestStatusCodeAndResponse(t *testing.T) {
 			fs := fmt.Sprint(test.expectedFields)
 			if v := fmt.Sprint(r.Error.Fields); v != fs {
 				t.Error("Fields did not match", v, fs)
-			}
-			if warnings != test.expectedWarnings {
-				t.Error("Warnings did not match")
 			}
 		})
 	}

@@ -3,11 +3,11 @@ Package http is used to generate common HTTP responses.
 
 Use StatusCodeAndResponse(...) in HTTP handlers to return a common JSON response.
 	{
-		error: {
+		"error": {
 			"code" : "<code passed to ctxerr.New/Wrap>",
 			"action" : "<value under the field key ctxerr.FieldKeyAction>",
 			"messsage" : "error.Error()",
-			"traceID" : "<opencensus trace ID>",
+			"traceID" : "<trace ID, if configured>",
 			"fields" : {},
 		}
 	}
@@ -86,19 +86,19 @@ func StatusCodeAndResponse(err error, showMessage, showFields bool) (int, ErrorR
 			switch v := sci.(type) {
 			case int:
 				statusCode = v
-				delete(fields, ctxerr.FieldKeyCode)
+				delete(fields, ctxerr.FieldKeyStatusCode)
 			default:
 				sc, err := strconv.Atoi(fmt.Sprint(v))
 				if err != nil {
-					ctx := ctxerr.SetField(context.Background(), ctxerr.FieldKeyRelatedCode, fields[ctxerr.FieldKeyCode])
+					ctx := ctxerr.SetField(context.Background(), "related_error_code", fields[ctxerr.FieldKeyCode])
 					ctx = ctxerr.SetField(ctx, "status code", v)
 					ctx = ctxerr.SetField(ctx, ctxerr.FieldKeyStatusCode, 418)
-					err = ctxerr.Wrap(ctx, err, "d81e453f-ce91-43a4-a443-404873b94c15", "could not convert status code to int")
+					err = ctxerr.Wrap(ctx, err, "ctxerr_http", "could not convert status code to int")
 					ctxerr.Handle(err)
 					break
 				}
 				statusCode = sc
-				delete(fields, ctxerr.FieldKeyCode)
+				delete(fields, ctxerr.FieldKeyStatusCode)
 			}
 		}
 		if showFields {

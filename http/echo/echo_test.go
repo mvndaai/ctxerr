@@ -56,7 +56,7 @@ func TestErrorHandler(t *testing.T) {
 	c := e.NewContext(req, rec)
 
 	handled := false
-	ctxerr.Handle = func(err error) { handled = true }
+	ctxerr.AddHandleHook(func(_ error) { handled = true })
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
