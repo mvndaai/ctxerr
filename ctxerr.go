@@ -53,14 +53,15 @@ It will run through all hooks added through configuration or fallback to the Def
 
 Configuration
 
-Configuration hooks can be used to exit the context before creating the error and to handle the error.
+Hooks can be used to edit the context before creating the error and to handle the error.
 
 If you need the context to change prior to creation of the error use 'AddCreateHook'.
+	ctxerr.AddCreateHook(customHook)
 
 To change how errors are handled use 'AddHandleHook'.
 Note: If you are not adding a custom logging hook it may be useful to add the default.
-	AddHandleHook(metricOnError)
-	AddHandleHook(DefaultLogHook)
+	ctxerr.AddHandleHook(metricOnError)
+	ctxerr.AddHandleHook(DefaultLogHook)
 
 
 HTTP

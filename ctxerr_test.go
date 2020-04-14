@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -493,4 +494,26 @@ func TestCustomizations(t *testing.T) {
 		t.Error("did not run handle hook")
 	}
 
+}
+
+func TestShortcutFunctions(t *testing.T) {
+	ctx := context.Background()
+
+	code := http.StatusOK
+	ctx = SetHTTPStatusCode(ctx, code)
+	if v := Fields(ctx)[FieldKeyStatusCode]; v != code {
+		t.Error("SetHTTPStatusCode did work as expected: ", v)
+	}
+
+	action := "action"
+	ctx = SetAction(ctx, action)
+	if v := Fields(ctx)[FieldKeyAction]; v != action {
+		t.Error("SetAction did work as expected: ", v)
+	}
+
+	category := "category"
+	ctx = SetCategory(ctx, category)
+	if v := Fields(ctx)[FieldKeyCategory]; v != category {
+		t.Error("SetCategory did work as expected: ", v)
+	}
 }
