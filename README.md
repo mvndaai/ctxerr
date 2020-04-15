@@ -1,6 +1,6 @@
 # ctxerr
 
-[![GODOC](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/mvndaai/ctxerr)
+[![DOC](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/mvndaai/ctxerr)
 [![Build
 Status](https://travis-ci.org/mvndaai/ctxerr.svg?branch=master)](https://travis-ci.org/mvndaai/ctxerr/)
 
