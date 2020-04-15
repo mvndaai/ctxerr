@@ -4,10 +4,11 @@ Package ctxerr is a way of creating and handling errors with extra context.
 Note: Errors can be wrapped as many times as wanted but should only be handled once!
 
 
-New and Wrap
+New(f) and Wrap(f)
 
 Creating a new error or wrapping an error are as simple as:
 	ctxerr.New(ctx, "<code>", "<message>")
+	ctxerr.Newf(ctx, "<code>", "%s", "<message>")
 	ctxerr.Wrap(ctx, err, "<code>", "<message>")
 
 A quick wrap function is available to avoid needing to create unused codes and messages.
