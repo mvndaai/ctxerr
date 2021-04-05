@@ -517,3 +517,15 @@ func TestShortcutFunctions(t *testing.T) {
 		t.Error("SetCategory did work as expected: ", v)
 	}
 }
+
+func TestWrappingWithNoUnderlyingCode(t *testing.T) {
+	expectedCode := "expected"
+	ctx := context.Background()
+	err := New(ctx, "", "0")
+	err = Wrap(ctx, err, expectedCode, "1")
+
+	code := AllFields(err)[FieldKeyCode]
+	if code != expectedCode {
+		t.Error("code did not match", code)
+	}
+}
