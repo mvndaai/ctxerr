@@ -7,22 +7,15 @@ packages=(
 )
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
 
-function test_packages () {
-	echo "Testing packages..."
-	for i in "${packages[@]}"; do
-		pushd $SCRIPT_DIR/$i &> /dev/null
-		echo -e "\nTesting: $(go list -m)"
-		go test ./...
-		popd &> /dev/null
-	done
-}
 
-function tidy_packages () {
-	echo "Tidying packages..."
-	for i in "${packages[@]}"; do
-		pushd $SCRIPT_DIR/$i &> /dev/null
-		echo -e "\nTidying: $(go list -m)"
-		go mod tidy
+function cmd_on_packages() {
+	echo "$1 packages..."
+	for package in "${packages[@]}"; do
+		pushd $SCRIPT_DIR/$package &> /dev/null
+		echo -e "\n${1}: $(go list -m)"
+		for cmd in "${@:2}"; do
+			($cmd)
+		done
 		popd &> /dev/null
 	done
 }
@@ -31,16 +24,25 @@ function tidy_packages () {
 ## Choose which function to use by argument
 case $1 in
 	t | test)
-		test_packages
+		cmd_on_packages "Testing" \
+			"go clean -testcache" \
+			"go test ./..."
 		;;
-	tidy)
-		tidy_packages
+	d | tidy)
+		cmd_on_packages "Tidying" "go mod tidy"
+		;;
+	u | update)
+		cmd_on_packages "Updating" \
+			"go get github.com/mvndaai/ctxerr" \
+			"go get -u ./..." \
+			"go mod tidy"
 		;;
 	*)
 		echo "Usage: $(basename $0) [OPTIONS]
 
 Options:
--t, --test        Runs 'go test ./...' for ctxerr and all subpackages
---tidy            Runs 'go mod tidy ./...' for ctxerr and all subpackages"
+-t, --test          Runs 'go test ./...' for ctxerr and all subpackages
+-d, --tidy          Runs 'go mod tidy ./...' for ctxerr and all subpackages
+-u, --update        Updates and tidyies ctxerr and all subpackages"
 		;;
 esac
