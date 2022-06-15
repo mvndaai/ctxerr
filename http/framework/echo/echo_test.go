@@ -11,7 +11,7 @@ import (
 	"github.com/labstack/echo"
 	"github.com/mvndaai/ctxerr"
 	ctxhttp "github.com/mvndaai/ctxerr/http"
-	ctxecho "github.com/mvndaai/ctxerr/http/echo"
+	ctxecho "github.com/mvndaai/ctxerr/http/framework/echo"
 )
 
 func TestErrorHandler(t *testing.T) {

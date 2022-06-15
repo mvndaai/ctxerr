@@ -1,6 +1,6 @@
 /*
 Package echo has functions to use with echo (https://echo.labstack.com).
-	import ctxecho "github.com/mvndaai/ctxerr/http/echo"
+	import ctxecho "github.com/mvndaai/ctxerr/http/framework/echo"
 
 	func main() {
 		...

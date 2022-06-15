@@ -78,12 +78,11 @@ package ctxerr
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"path/filepath"
 	"runtime"
-
-	"golang.org/x/xerrors"
 )
 
 func init() {
@@ -135,10 +134,10 @@ func AddHandleHook(f func(error)) {
 	handleHooks = append(handleHooks, f)
 }
 
-// CtxErr is the interface that should be checked in a xerrors As function
+// CtxErr is the interface that should be checked in a errors.As function
 type CtxErr interface {
 	error
-	xerrors.Wrapper
+	Unwrap() error
 	Is(error) bool
 	As(interface{}) bool
 
@@ -262,13 +261,13 @@ func AllFields(err error) map[string]interface{} {
 		if err == nil {
 			return f
 		}
-		if ok := xerrors.As(err, &e); !ok {
+		if ok := errors.As(err, &e); !ok {
 			return f
 		}
 		for k, v := range e.Fields() {
 			f[k] = v
 		}
-		err = xerrors.Unwrap(err)
+		err = errors.Unwrap(err)
 	}
 }
 
@@ -279,7 +278,7 @@ func As(err error) (CtxErr, bool) {
 	}
 
 	var e CtxErr = &impl{}
-	if ok := xerrors.As(err, &e); !ok {
+	if ok := errors.As(err, &e); !ok {
 		return nil, false
 	}
 
@@ -292,7 +291,7 @@ func HasCategory(err error, category interface{}) bool {
 		return false
 	}
 	var e CtxErr = &impl{}
-	if !xerrors.As(err, &e) {
+	if !errors.As(err, &e) {
 		return false
 	}
 	for {
@@ -301,8 +300,8 @@ func HasCategory(err error, category interface{}) bool {
 				return true
 			}
 		}
-		u := xerrors.Unwrap(e)
-		if xerrors.As(u, &e) {
+		u := errors.Unwrap(e)
+		if errors.As(u, &e) {
 			continue
 		}
 		break
@@ -322,13 +321,13 @@ type impl struct {
 
 // Error fulfills the error interface
 func (im *impl) Error() string {
-	if u := xerrors.Unwrap(im); u != nil {
+	if u := errors.Unwrap(im); u != nil {
 		return im.msg + " : " + u.Error()
 	}
 	return im.msg
 }
 
-// Unwrap fulfills the xerrors Wrapper interface
+// Unwrap fulfills the interface to allow errors.Unwrap
 func (im *impl) Unwrap() error { return im.wrapped }
 
 // As Fulfills the As interface to know if something is the same type
@@ -337,7 +336,7 @@ func (im *impl) As(err interface{}) bool {
 	return ok
 }
 
-// Is fulfills the interface to allow xerrors.Is
+// Is fulfills the interface to allow errors.Is
 func (im *impl) Is(err error) bool { return im.As(err) }
 
 // Context retrieves the context passed in when the error was created
