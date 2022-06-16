@@ -147,6 +147,10 @@ func TestStatusCodeAndResponse(t *testing.T) {
 			if v := r.Error.Message; v != test.expectedMessage {
 				t.Error("Message did not match", v, test.expectedMessage)
 			}
+
+			// Ignore location field in test
+			delete(r.Error.Fields, ctxerr.FieldKeyLocation)
+
 			fs := fmt.Sprint(test.expectedFields)
 			if v := fmt.Sprint(r.Error.Fields); v != fs {
 				t.Error("Fields did not match", v, fs)

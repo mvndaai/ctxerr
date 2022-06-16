@@ -12,7 +12,7 @@ Creating a new error or wrapping an error are as simple as:
 	ctxerr.Wrap(ctx, err, "<code>", "<message>")
 
 A quick wrap function is available to avoid needing to create unused codes and messages.
-This function calls Wrap with an empty string for the code and calls "ctxerr.CallerFunc(1)" for the message.
+This function calls Wrap with an empty string for the code no message.
 	ctxerr.QuickWrap(ctx, err)
 
 Note: Wrapping nil will return nil.
@@ -83,11 +83,13 @@ import (
 	"log"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 func init() {
 	// Always add the code to the fields
 	AddCreateHook(setCodeHook)
+	AddCreateHook(setLocationHook)
 }
 
 var createHooks []func(ctx context.Context, code string, wrapping error) context.Context
@@ -102,6 +104,8 @@ const (
 	FieldKeyAction = "error_action"
 	//FieldKeyCategory can be used with IsCategorgy(...) to determin a category of error
 	FieldKeyCategory = "error_category"
+	//FieldKeyLocation shows the file location of the err
+	FieldKeyLocation = "error_location"
 )
 
 // FieldsKey is the key used to add and decode fields on the context
@@ -152,10 +156,11 @@ func New(ctx context.Context, code string, message ...interface{}) error {
 		ctx = hook(ctx, code, nil)
 	}
 
-	return &impl{
-		ctx: ctx,
-		msg: fmt.Sprint(message...),
+	im := &impl{ctx: ctx}
+	if len(message) > 0 && message[0] != nil {
+		im.msg = fmt.Sprint(message...)
 	}
+	return im
 }
 
 // Newf creates a new error message formatting
@@ -180,11 +185,15 @@ func Wrap(ctx context.Context, err error, code string, message ...interface{}) e
 		ctx = hook(ctx, code, err)
 	}
 
-	return &impl{
+	im := &impl{
 		ctx:     ctx,
-		msg:     fmt.Sprint(message...),
 		wrapped: err,
 	}
+
+	if len(message) > 0 && message[0] != nil {
+		im.msg = fmt.Sprint(message...)
+	}
+	return im
 }
 
 // Wrapf creates a new error with a formatted message with another wrapped under it
@@ -206,7 +215,7 @@ func Wrapf(ctx context.Context, err error, code, message string, messageArgs ...
 
 // QuickWrap will wrap an error with an empty code and the calling function's name as the message
 func QuickWrap(ctx context.Context, err error) error {
-	return Wrap(ctx, err, "", CallerFunc(1))
+	return Wrap(ctx, err, "", nil)
 }
 
 // Fields retrieves the fields from the context
@@ -245,12 +254,22 @@ func SetFields(ctx context.Context, fields map[string]interface{}) context.Conte
 
 //CallerFunc gets the name of the calling function
 func CallerFunc(skip int) string {
+	f := "caller location unretrievable"
 	if pc, _, _, ok := runtime.Caller(skip + 1); ok {
 		if details := runtime.FuncForPC(pc); details != nil {
-			return filepath.Base(details.Name())
+			f = filepath.Base(details.Name())
 		}
 	}
-	return "caller location unretrievable"
+
+	// For helper functions QuickWrap and we still want the hook getting the location
+	skipPrefixes := []string{"ctxerr.New", "ctxerr.Wrap", "ctxerr.QuickWrap"}
+	for _, prefix := range skipPrefixes {
+		if strings.HasPrefix(f, prefix) {
+			f = CallerFunc(skip + 2)
+		}
+	}
+
+	return f
 }
 
 // AllFields unwraps the error collecting/replacing fields as it goes down the tree
@@ -265,6 +284,13 @@ func AllFields(err error) map[string]interface{} {
 			return f
 		}
 		for k, v := range e.Fields() {
+			if k == FieldKeyLocation {
+				if _, ok := f[k]; !ok {
+					f[k] = []interface{}{}
+				}
+				f[k] = append(f[k].([]interface{}), v)
+				continue
+			}
 			f[k] = v
 		}
 		err = errors.Unwrap(err)
@@ -322,6 +348,9 @@ type impl struct {
 // Error fulfills the error interface
 func (im *impl) Error() string {
 	if u := errors.Unwrap(im); u != nil {
+		if im.msg == "" {
+			return u.Error()
+		}
 		return im.msg + " : " + u.Error()
 	}
 	return im.msg
@@ -384,4 +413,55 @@ func setCodeHook(ctx context.Context, code string, wrapping error) context.Conte
 		ctx = SetField(ctx, FieldKeyCode, code)
 	}
 	return ctx
+}
+
+func setLocationHook(ctx context.Context, code string, wrapping error) context.Context {
+	ctx = SetField(ctx, FieldKeyLocation, CallerFunc(2))
+	return ctx
+}
+
+/* HTTP helper function */
+
+// NewHTTP creates a new error with action and status code
+func NewHTTP(ctx context.Context, code, action string, statusCode int, message ...interface{}) error {
+	if action != "" {
+		ctx = SetAction(ctx, action)
+	}
+	if statusCode != 0 {
+		ctx = SetHTTPStatusCode(ctx, statusCode)
+	}
+	return New(ctx, code, message...)
+}
+
+// Newf creates a new error  with action and status code and message formatting
+func NewHTTPf(ctx context.Context, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
+	if action != "" {
+		ctx = SetAction(ctx, action)
+	}
+	if statusCode != 0 {
+		ctx = SetHTTPStatusCode(ctx, statusCode)
+	}
+	return Newf(ctx, code, message, messageArgs...)
+}
+
+// Wrap creates a new error with action and status code and another wrapped under it
+func WrapHTTP(ctx context.Context, err error, code, action string, statusCode int, message ...interface{}) error {
+	if action != "" {
+		ctx = SetAction(ctx, action)
+	}
+	if statusCode != 0 {
+		ctx = SetHTTPStatusCode(ctx, statusCode)
+	}
+	return Wrap(ctx, err, code, message...)
+}
+
+// Wrapf creates a new error  with action and status code and a formatted message with another wrapped under it
+func WrapHTTPf(ctx context.Context, err error, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
+	if action != "" {
+		ctx = SetAction(ctx, action)
+	}
+	if statusCode != 0 {
+		ctx = SetHTTPStatusCode(ctx, statusCode)
+	}
+	return Wrapf(ctx, err, code, message, messageArgs...)
 }

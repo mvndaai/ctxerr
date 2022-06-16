@@ -2,6 +2,7 @@ package ctxerr
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -172,9 +173,13 @@ func TestOverall(t *testing.T) {
 			}
 
 			logFields := AllFields(err)
+
+			// Ignore location field
+			delete(logFields, FieldKeyLocation)
+
+			t.Logf("fields %+v", logFields)
 			if len(tt.expectedFields) != len(logFields) {
 				t.Errorf("Fields count did not match:\n%s\n%s", logFields, tt.expectedFields)
-
 			}
 			for k, v := range tt.expectedFields {
 				if fv := logFields[k]; fv != v {
@@ -197,7 +202,7 @@ func TestQuickWrap(t *testing.T) {
 		{
 			name:            "external",
 			err:             func(ctx context.Context) error { return QuickWrap(ctx, errors.New("external")) },
-			expectedMessage: "ctxerr.TestQuickWrap.func1 : external",
+			expectedMessage: "external",
 			expectedCode:    nil,
 		},
 		{
@@ -205,7 +210,7 @@ func TestQuickWrap(t *testing.T) {
 			err: func(ctx context.Context) error {
 				return QuickWrap(ctx, New(ctx, "code", "ctxerr"))
 			},
-			expectedMessage: "ctxerr.TestQuickWrap.func2 : ctxerr",
+			expectedMessage: "ctxerr",
 			expectedCode:    "code",
 		},
 		{
@@ -216,7 +221,7 @@ func TestQuickWrap(t *testing.T) {
 				err = QuickWrap(ctx, err)
 				return QuickWrap(ctx, err)
 			},
-			expectedMessage: "ctxerr.TestQuickWrap.func3 : ctxerr.TestQuickWrap.func3 : ctxerr.TestQuickWrap.func3 : double wrap",
+			expectedMessage: "double wrap",
 			expectedCode:    nil,
 		},
 	}
@@ -252,6 +257,94 @@ func TestCallerFunc(t *testing.T) {
 
 	if acf != anonExpected {
 		t.Error("Anonymous func not match expected", acf, anonExpected)
+	}
+}
+
+func TestLocation(t *testing.T) {
+	tests := []struct {
+		name            string
+		err             error
+		locationPrefixs []string // this accounts for annonymous functions
+	}{
+		{
+			name:            "New",
+			err:             New(context.Background(), "code", nil),
+			locationPrefixs: []string{"ctxerr.TestLocation"},
+		},
+		{
+			name:            "Newf",
+			err:             Newf(context.Background(), "code", ""),
+			locationPrefixs: []string{"ctxerr.TestLocation"},
+		},
+		{
+			name:            "Wrap",
+			err:             Wrap(context.Background(), fmt.Errorf(""), "code", ""),
+			locationPrefixs: []string{"ctxerr.TestLocation"},
+		},
+		{
+			name:            "Wrapf",
+			err:             Wrapf(context.Background(), fmt.Errorf(""), "code", ""),
+			locationPrefixs: []string{"ctxerr.TestLocation"},
+		},
+		{
+			name:            "NewHTTP",
+			err:             NewHTTP(context.Background(), "code", "", 0, nil),
+			locationPrefixs: []string{"ctxerr.TestLocation"},
+		},
+		{
+			name:            "NewHTTPf",
+			err:             NewHTTPf(context.Background(), "code", "", 0, ""),
+			locationPrefixs: []string{"ctxerr.TestLocation"},
+		},
+		{
+			name:            "WrapHTTP",
+			err:             WrapHTTP(context.Background(), fmt.Errorf(""), "code", "", 0, nil),
+			locationPrefixs: []string{"ctxerr.TestLocation"},
+		},
+		{
+			name:            "WrapHTTPf",
+			err:             WrapHTTPf(context.Background(), fmt.Errorf(""), "code", "", 0, ""),
+			locationPrefixs: []string{"ctxerr.TestLocation"},
+		},
+		{
+			name:            "QuickWrap",
+			err:             QuickWrap(context.Background(), fmt.Errorf("")),
+			locationPrefixs: []string{"ctxerr.TestLocation"},
+		},
+		{
+			name: "complicated",
+			err: func() error {
+				ctx := context.Background()
+				err := func(ctx context.Context) error {
+					return New(ctx, "code", "")
+				}(ctx)
+				return QuickWrap(ctx, err)
+			}(),
+			locationPrefixs: []string{"ctxerr.TestLocation.func1", "ctxerr.TestLocation.func1.1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			locs := AllFields(tt.err)[FieldKeyLocation].([]interface{})
+			if len(locs) == 0 {
+				t.Error("Location count is 0")
+			}
+
+			if len(locs) != len(tt.locationPrefixs) {
+				b1, _ := json.Marshal(locs)
+				b2, _ := json.Marshal(tt.locationPrefixs)
+				t.Logf("Locations :\n%s\n%s", string(b1), string(b2))
+				t.Errorf("Location count did not match:%v -%v", len(locs), len(tt.locationPrefixs))
+			}
+
+			for i, loc := range locs {
+				t.Logf("'%s' '%s'", fmt.Sprint(loc), tt.locationPrefixs[i])
+				if !strings.HasPrefix(fmt.Sprint(loc), tt.locationPrefixs[i]) {
+					t.Errorf("Location did not match:\n'%s'\n'%s'", loc, tt.locationPrefixs[i])
+				}
+			}
+		})
 	}
 }
 
@@ -350,9 +443,11 @@ func TestCategory(t *testing.T) {
 	}
 }
 
+type testContextKey string
+
 func TestAddingToContext(t *testing.T) {
 	actx := context.Background()
-	var bKey interface{} = "b"
+	var bKey testContextKey = "b"
 	bKeyVal := "b"
 	bctx := context.WithValue(actx, bKey, bKeyVal)
 
@@ -527,5 +622,120 @@ func TestWrappingWithNoUnderlyingCode(t *testing.T) {
 	code := AllFields(err)[FieldKeyCode]
 	if code != expectedCode {
 		t.Error("code did not match", code)
+	}
+}
+
+func TestHTTPFuncs(t *testing.T) {
+	tests := []struct {
+		name               string
+		err                error
+		expectedCode       interface{}
+		expectedAction     interface{}
+		expectedStatusCode interface{}
+		expectedMessage    string
+	}{
+		{
+			name:               "NewHTTP",
+			err:                NewHTTP(context.Background(), "c", "a", http.StatusBadRequest, "m", 1, "v"),
+			expectedCode:       "c",
+			expectedAction:     "a",
+			expectedStatusCode: http.StatusBadRequest,
+			expectedMessage:    "m1v",
+		},
+		{
+			name:               "NewHTTPf",
+			err:                NewHTTPf(context.Background(), "c", "a", http.StatusConflict, "m %02d%s", 1, "v"),
+			expectedCode:       "c",
+			expectedAction:     "a",
+			expectedStatusCode: http.StatusConflict,
+			expectedMessage:    "m 01v",
+		},
+		{
+			name:               "WrapHTTP",
+			err:                WrapHTTP(context.Background(), fmt.Errorf("e"), "c", "a", 0, "m", 1, "v"),
+			expectedCode:       "c",
+			expectedAction:     "a",
+			expectedStatusCode: nil,
+			expectedMessage:    "m1v : e",
+		},
+		{
+			name:               "WrapHTTPf",
+			err:                WrapHTTPf(context.Background(), fmt.Errorf("e"), "c", "a", http.StatusBadRequest, "m %02d%s", 1, "v"),
+			expectedCode:       "c",
+			expectedAction:     "a",
+			expectedStatusCode: http.StatusBadRequest,
+			expectedMessage:    "m 01v : e",
+		},
+		{
+			name:               "WrapHTTP nil error",
+			err:                WrapHTTP(context.Background(), nil, "c", "a", 0, "m", 1, "v"),
+			expectedCode:       nil,
+			expectedAction:     nil,
+			expectedStatusCode: nil,
+			expectedMessage:    "ignored",
+		},
+		{
+			name:               "WrapHTTPf nil error",
+			err:                WrapHTTPf(context.Background(), nil, "c", "a", http.StatusBadRequest, "m %02d%s", 1, "v"),
+			expectedCode:       nil,
+			expectedAction:     nil,
+			expectedStatusCode: nil,
+			expectedMessage:    "ignored",
+		},
+		{
+			name: "Status-code-already-on-context",
+			err: func() error {
+				ctx := SetHTTPStatusCode(context.Background(), http.StatusInternalServerError)
+				return NewHTTP(ctx, "c", "a", http.StatusBadRequest, "m")
+			}(),
+			expectedCode:       "c",
+			expectedAction:     "a",
+			expectedStatusCode: http.StatusBadRequest,
+			expectedMessage:    "m",
+		},
+		{
+			name: "Wrapped error already has status code and action",
+			err: func() error {
+				err := NewHTTP(context.Background(), "ci", "ai", http.StatusBadRequest, "mi")
+				return WrapHTTP(context.Background(), err, "co", "ao", http.StatusConflict, "mo")
+			}(),
+			expectedCode:       "ci",
+			expectedAction:     "ai",
+			expectedStatusCode: http.StatusBadRequest,
+			expectedMessage:    "mo : mi",
+		},
+		{
+			name: "Wrapped error already has status code and action same context",
+			err: func() error {
+				ctx := context.Background()
+				err := NewHTTP(ctx, "ci", "ai", http.StatusBadRequest, "mi")
+				return WrapHTTP(ctx, err, "co", "ao", http.StatusConflict, "mo")
+			}(),
+			expectedCode:       "ci",
+			expectedAction:     "ai",
+			expectedStatusCode: http.StatusBadRequest,
+			expectedMessage:    "mo : mi",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := AllFields(tt.err)
+
+			if v := f[FieldKeyCode]; v != tt.expectedCode {
+				t.Errorf("code did not match: %v", v)
+			}
+			if v := f[FieldKeyAction]; v != tt.expectedAction {
+				t.Errorf("action did not match: %v - %v", v, tt.expectedAction)
+			}
+			if v := f[FieldKeyStatusCode]; v != tt.expectedStatusCode {
+				t.Errorf("status code did not match: %v - %v", v, tt.expectedStatusCode)
+			}
+			if tt.err != nil {
+				if v := tt.err.Error(); v != tt.expectedMessage {
+					t.Errorf("message did not match: %v - %v", v, tt.expectedMessage)
+				}
+			}
+		})
 	}
 }

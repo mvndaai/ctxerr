@@ -1,10 +1,6 @@
 #!/bin/bash
 
-packages=(
-	'.'
-	'http/framework/echo'
-	'http/trace/opencensus'
-)
+packages=($(find . -name "go.mod" -print0 | xargs -0 -n1 dirname | sort --unique))
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
 
 
