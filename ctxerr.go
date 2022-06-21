@@ -88,8 +88,12 @@ import (
 
 // Instance creates a local instance so you can have a different setup than global
 type Instance struct {
+	// CreateHooks are functions that run on creation to set fields on context
 	CreateHooks []func(ctx context.Context, code string, wrapping error) context.Context
+	// HandleHooks are functions that run on ctxerr.Handle
 	HandleHooks []func(error)
+	// FieldsAsSlice are keys that get gathered as a slice in ctxerr.AllFields
+	FieldsAsSlice []string
 }
 
 // NewInstance creates a local instance with the default create hooks
@@ -97,7 +101,10 @@ func NewInstance() Instance {
 	in := Instance{}
 	// Always add the code to the fields
 	in.AddCreateHook(SetCodeHook)
+	// Always add the location of where the error happened
 	in.AddCreateHook(SetLocationHook)
+	// Gather keys like location as slice instead of just the deepest value
+	in.FieldsAsSlice = []string{FieldKeyLocation}
 	return in
 }
 
@@ -128,7 +135,7 @@ func (in *Instance) Handle(err error) {
 	}
 
 	if len(in.HandleHooks) == 0 {
-		DefaultLogHook(err)
+		in.DefaultLogHook(err)
 		return
 	}
 
@@ -297,7 +304,8 @@ func CallerFunc(skip int) string {
 }
 
 // AllFields unwraps the error collecting/replacing fields as it goes down the tree
-func AllFields(err error) map[string]interface{} {
+func AllFields(err error) map[string]interface{} { return global.AllFields(err) }
+func (in *Instance) AllFields(err error) map[string]interface{} {
 	f := map[string]interface{}{}
 	var e CtxErr = &impl{}
 	for {
@@ -307,13 +315,17 @@ func AllFields(err error) map[string]interface{} {
 		if ok := errors.As(err, &e); !ok {
 			return f
 		}
+	OUTER:
 		for k, v := range e.Fields() {
-			if k == FieldKeyLocation {
-				if _, ok := f[k]; !ok {
-					f[k] = []interface{}{}
+			for _, sk := range in.FieldsAsSlice {
+				if k == sk {
+					if _, ok := f[k]; !ok {
+						f[k] = []interface{}{}
+					}
+
+					f[k] = append(f[k].([]interface{}), v)
+					continue OUTER
 				}
-				f[k] = append(f[k].([]interface{}), v)
-				continue
 			}
 			f[k] = v
 		}
@@ -441,8 +453,9 @@ func SetCategory(ctx context.Context, category interface{}) context.Context {
 
 // DefaultLogHook is the default hook used log errors
 // It is the fallback if there are no other handle hooks
-func DefaultLogHook(err error) {
-	f := AllFields(err)
+func DefaultLogHook(err error) { global.DefaultLogHook(err) }
+func (in Instance) DefaultLogHook(err error) {
+	f := in.AllFields(err)
 	b, merr := json.Marshal(f)
 	fields := string(b)
 	if merr != nil {
