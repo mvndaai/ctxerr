@@ -86,14 +86,22 @@ import (
 	"strings"
 )
 
-func init() {
-	// Always add the code to the fields
-	AddCreateHook(setCodeHook)
-	AddCreateHook(setLocationHook)
+// Instance creates a local instance so you can have a different setup than global
+type Instance struct {
+	CreateHooks []func(ctx context.Context, code string, wrapping error) context.Context
+	HandleHooks []func(error)
 }
 
-var createHooks []func(ctx context.Context, code string, wrapping error) context.Context
-var handleHooks []func(error)
+// NewInstance creates a local instance with the default create hooks
+func NewInstance() Instance {
+	in := Instance{}
+	// Always add the code to the fields
+	in.AddCreateHook(SetCodeHook)
+	in.AddCreateHook(SetLocationHook)
+	return in
+}
+
+var global = NewInstance()
 
 const (
 	// FieldKeyCode should be unique to the error
@@ -113,29 +121,34 @@ const (
 var FieldsKey interface{} = contextKey("fields")
 
 // Handle should be called one per error to handle it when it can no logger be returned
-func Handle(err error) {
+func Handle(err error) { global.Handle(err) }
+func (in *Instance) Handle(err error) {
 	if err == nil {
 		return
 	}
 
-	if len(handleHooks) == 0 {
+	if len(in.HandleHooks) == 0 {
 		DefaultLogHook(err)
 		return
 	}
 
-	for _, hook := range handleHooks {
+	for _, hook := range in.HandleHooks {
 		hook(err)
 	}
 }
 
 // AddCreateHook adds a hooks that is called to update the context before the error is created
 func AddCreateHook(f func(ctx context.Context, code string, wrapping error) context.Context) {
-	createHooks = append(createHooks, f)
+	global.AddCreateHook(f)
+}
+func (in *Instance) AddCreateHook(f func(ctx context.Context, code string, wrapping error) context.Context) {
+	in.CreateHooks = append(in.CreateHooks, f)
 }
 
 // AddHandleHook adds a hook to be run on handling of an error
-func AddHandleHook(f func(error)) {
-	handleHooks = append(handleHooks, f)
+func AddHandleHook(f func(error)) { global.AddHandleHook(f) }
+func (in *Instance) AddHandleHook(f func(error)) {
+	in.HandleHooks = append(in.HandleHooks, f)
 }
 
 // CtxErr is the interface that should be checked in a errors.As function
@@ -152,7 +165,10 @@ type CtxErr interface {
 
 // New creates a new error
 func New(ctx context.Context, code string, message ...interface{}) error {
-	for _, hook := range createHooks {
+	return global.New(ctx, code, message...)
+}
+func (in *Instance) New(ctx context.Context, code string, message ...interface{}) error {
+	for _, hook := range in.CreateHooks {
 		ctx = hook(ctx, code, nil)
 	}
 
@@ -165,7 +181,11 @@ func New(ctx context.Context, code string, message ...interface{}) error {
 
 // Newf creates a new error message formatting
 func Newf(ctx context.Context, code, message string, messageArgs ...interface{}) error {
-	for _, hook := range createHooks {
+	return global.Newf(ctx, code, message, messageArgs...)
+}
+
+func (in *Instance) Newf(ctx context.Context, code, message string, messageArgs ...interface{}) error {
+	for _, hook := range in.CreateHooks {
 		ctx = hook(ctx, code, nil)
 	}
 
@@ -177,11 +197,15 @@ func Newf(ctx context.Context, code, message string, messageArgs ...interface{})
 
 // Wrap creates a new error with another wrapped under it
 func Wrap(ctx context.Context, err error, code string, message ...interface{}) error {
+	return global.Wrap(ctx, err, code, message...)
+}
+
+func (in *Instance) Wrap(ctx context.Context, err error, code string, message ...interface{}) error {
 	if err == nil {
 		return nil
 	}
 
-	for _, hook := range createHooks {
+	for _, hook := range in.CreateHooks {
 		ctx = hook(ctx, code, err)
 	}
 
@@ -198,11 +222,14 @@ func Wrap(ctx context.Context, err error, code string, message ...interface{}) e
 
 // Wrapf creates a new error with a formatted message with another wrapped under it
 func Wrapf(ctx context.Context, err error, code, message string, messageArgs ...interface{}) error {
+	return global.Wrapf(ctx, err, code, message, messageArgs...)
+}
+func (in *Instance) Wrapf(ctx context.Context, err error, code, message string, messageArgs ...interface{}) error {
 	if err == nil {
 		return nil
 	}
 
-	for _, hook := range createHooks {
+	for _, hook := range in.CreateHooks {
 		ctx = hook(ctx, code, err)
 	}
 
@@ -262,11 +289,8 @@ func CallerFunc(skip int) string {
 	}
 
 	// For helper functions QuickWrap and we still want the hook getting the location
-	skipPrefixes := []string{"ctxerr.New", "ctxerr.Wrap", "ctxerr.QuickWrap"}
-	for _, prefix := range skipPrefixes {
-		if strings.HasPrefix(f, prefix) {
-			f = CallerFunc(skip + 2)
-		}
+	if strings.HasPrefix(f, "ctxerr.") {
+		return CallerFunc(skip + 2)
 	}
 
 	return f
@@ -293,6 +317,25 @@ func AllFields(err error) map[string]interface{} {
 			}
 			f[k] = v
 		}
+		err = errors.Unwrap(err)
+	}
+}
+
+// HasField unwraps and checks if the error has a field anywhere i
+func HasField(err error, field string) bool {
+	var e CtxErr = &impl{}
+	for {
+		if err == nil {
+			return false
+		}
+		if ok := errors.As(err, &e); !ok {
+			return false
+		}
+
+		if _, ok := e.Fields()[field]; ok {
+			return true
+		}
+
 		err = errors.Unwrap(err)
 	}
 }
@@ -408,14 +451,16 @@ func DefaultLogHook(err error) {
 	log.Printf("%s - %s", err, fields)
 }
 
-func setCodeHook(ctx context.Context, code string, wrapping error) context.Context {
+// SetCodeHook takes the code and adds it to the context
+func SetCodeHook(ctx context.Context, code string, wrapping error) context.Context {
 	if code != "" {
 		ctx = SetField(ctx, FieldKeyCode, code)
 	}
 	return ctx
 }
 
-func setLocationHook(ctx context.Context, code string, wrapping error) context.Context {
+// SetLocationHook get the location of where the error happened and adds it to the context
+func SetLocationHook(ctx context.Context, code string, wrapping error) context.Context {
 	ctx = SetField(ctx, FieldKeyLocation, CallerFunc(2))
 	return ctx
 }
@@ -424,6 +469,9 @@ func setLocationHook(ctx context.Context, code string, wrapping error) context.C
 
 // NewHTTP creates a new error with action and status code
 func NewHTTP(ctx context.Context, code, action string, statusCode int, message ...interface{}) error {
+	return global.NewHTTP(ctx, code, action, statusCode, message...)
+}
+func (in *Instance) NewHTTP(ctx context.Context, code, action string, statusCode int, message ...interface{}) error {
 	if action != "" {
 		ctx = SetAction(ctx, action)
 	}
@@ -435,6 +483,9 @@ func NewHTTP(ctx context.Context, code, action string, statusCode int, message .
 
 // Newf creates a new error  with action and status code and message formatting
 func NewHTTPf(ctx context.Context, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
+	return global.NewHTTPf(ctx, code, action, statusCode, message, messageArgs...)
+}
+func (in *Instance) NewHTTPf(ctx context.Context, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
 	if action != "" {
 		ctx = SetAction(ctx, action)
 	}
@@ -446,6 +497,9 @@ func NewHTTPf(ctx context.Context, code, action string, statusCode int, message 
 
 // Wrap creates a new error with action and status code and another wrapped under it
 func WrapHTTP(ctx context.Context, err error, code, action string, statusCode int, message ...interface{}) error {
+	return global.WrapHTTP(ctx, err, code, action, statusCode, message...)
+}
+func (in *Instance) WrapHTTP(ctx context.Context, err error, code, action string, statusCode int, message ...interface{}) error {
 	if action != "" {
 		ctx = SetAction(ctx, action)
 	}
@@ -457,6 +511,9 @@ func WrapHTTP(ctx context.Context, err error, code, action string, statusCode in
 
 // Wrapf creates a new error  with action and status code and a formatted message with another wrapped under it
 func WrapHTTPf(ctx context.Context, err error, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
+	return global.WrapHTTPf(ctx, err, code, action, statusCode, message, messageArgs...)
+}
+func (in *Instance) WrapHTTPf(ctx context.Context, err error, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
 	if action != "" {
 		ctx = SetAction(ctx, action)
 	}
