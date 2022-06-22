@@ -45,6 +45,35 @@ func TestNil(t *testing.T) {
 		t.Error("error should have been nil")
 	}
 	ctxerr.Handle(err)
+
+	// Prettier message when instance is nil
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				if !strings.HasSuffix(fmt.Sprint(r), "ctxerr.Instance is nil") {
+					t.Error("recovered with wrong message:", r)
+				}
+			} else {
+				t.Error("expected to recover")
+			}
+		}()
+		var in *ctxerr.Instance
+		in.AddCreateHook(ctxerr.SetCodeHook)
+	}()
+
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				if !strings.HasSuffix(fmt.Sprint(r), "ctxerr.Instance is nil") {
+					t.Error("recovered with wrong message:", r)
+				}
+			} else {
+				t.Error("expected to recover")
+			}
+		}()
+		var in *ctxerr.Instance
+		in.AddHandleHook(ctxerr.DefaultLogHook)
+	}()
 }
 
 func TestOverall(t *testing.T) {

@@ -154,12 +154,20 @@ func AddCreateHook(f func(ctx context.Context, code string, wrapping error) cont
 	global.AddCreateHook(f)
 }
 func (in *Instance) AddCreateHook(f func(ctx context.Context, code string, wrapping error) context.Context) {
+	if in == nil {
+		// cannot return an error so adding info to panic
+		panic("cannot call AddCreateHook because ctxerr.Instance is nil")
+	}
 	in.CreateHooks = append(in.CreateHooks, f)
 }
 
 // AddHandleHook adds a hook to be run on handling of an error
 func AddHandleHook(f func(error)) { global.AddHandleHook(f) }
 func (in *Instance) AddHandleHook(f func(error)) {
+	if in == nil {
+		// cannot return an error so adding info to panic
+		panic("cannot call AddHandleHook because ctxerr.Instance is nil")
+	}
 	in.HandleHooks = append(in.HandleHooks, f)
 }
 
