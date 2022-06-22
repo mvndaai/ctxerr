@@ -134,7 +134,7 @@ var FieldsKey interface{} = contextKey("fields")
 
 // Handle should be called one per error to handle it when it can no logger be returned
 func Handle(err error) { global.Handle(err) }
-func (in *Instance) Handle(err error) {
+func (in Instance) Handle(err error) {
 	if err == nil {
 		return
 	}
@@ -179,7 +179,7 @@ type CtxErr interface {
 func New(ctx context.Context, code string, message ...interface{}) error {
 	return global.New(ctx, code, message...)
 }
-func (in *Instance) New(ctx context.Context, code string, message ...interface{}) error {
+func (in Instance) New(ctx context.Context, code string, message ...interface{}) error {
 	for _, hook := range in.CreateHooks {
 		ctx = hook(ctx, code, nil)
 	}
@@ -196,7 +196,7 @@ func Newf(ctx context.Context, code, message string, messageArgs ...interface{})
 	return global.Newf(ctx, code, message, messageArgs...)
 }
 
-func (in *Instance) Newf(ctx context.Context, code, message string, messageArgs ...interface{}) error {
+func (in Instance) Newf(ctx context.Context, code, message string, messageArgs ...interface{}) error {
 	for _, hook := range in.CreateHooks {
 		ctx = hook(ctx, code, nil)
 	}
@@ -212,7 +212,7 @@ func Wrap(ctx context.Context, err error, code string, message ...interface{}) e
 	return global.Wrap(ctx, err, code, message...)
 }
 
-func (in *Instance) Wrap(ctx context.Context, err error, code string, message ...interface{}) error {
+func (in Instance) Wrap(ctx context.Context, err error, code string, message ...interface{}) error {
 	if err == nil {
 		return nil
 	}
@@ -236,7 +236,7 @@ func (in *Instance) Wrap(ctx context.Context, err error, code string, message ..
 func Wrapf(ctx context.Context, err error, code, message string, messageArgs ...interface{}) error {
 	return global.Wrapf(ctx, err, code, message, messageArgs...)
 }
-func (in *Instance) Wrapf(ctx context.Context, err error, code, message string, messageArgs ...interface{}) error {
+func (in Instance) Wrapf(ctx context.Context, err error, code, message string, messageArgs ...interface{}) error {
 	if err == nil {
 		return nil
 	}
@@ -310,7 +310,7 @@ func CallerFunc(skip int) string {
 
 // AllFields unwraps the error collecting/replacing fields as it goes down the tree
 func AllFields(err error) map[string]interface{} { return global.AllFields(err) }
-func (in *Instance) AllFields(err error) map[string]interface{} {
+func (in Instance) AllFields(err error) map[string]interface{} {
 	f := map[string]interface{}{}
 	var e CtxErr = &impl{}
 	for {
@@ -489,7 +489,7 @@ func SetLocationHook(ctx context.Context, code string, wrapping error) context.C
 func NewHTTP(ctx context.Context, code, action string, statusCode int, message ...interface{}) error {
 	return global.NewHTTP(ctx, code, action, statusCode, message...)
 }
-func (in *Instance) NewHTTP(ctx context.Context, code, action string, statusCode int, message ...interface{}) error {
+func (in Instance) NewHTTP(ctx context.Context, code, action string, statusCode int, message ...interface{}) error {
 	if action != "" {
 		ctx = SetAction(ctx, action)
 	}
@@ -503,7 +503,7 @@ func (in *Instance) NewHTTP(ctx context.Context, code, action string, statusCode
 func NewHTTPf(ctx context.Context, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
 	return global.NewHTTPf(ctx, code, action, statusCode, message, messageArgs...)
 }
-func (in *Instance) NewHTTPf(ctx context.Context, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
+func (in Instance) NewHTTPf(ctx context.Context, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
 	if action != "" {
 		ctx = SetAction(ctx, action)
 	}
@@ -517,7 +517,7 @@ func (in *Instance) NewHTTPf(ctx context.Context, code, action string, statusCod
 func WrapHTTP(ctx context.Context, err error, code, action string, statusCode int, message ...interface{}) error {
 	return global.WrapHTTP(ctx, err, code, action, statusCode, message...)
 }
-func (in *Instance) WrapHTTP(ctx context.Context, err error, code, action string, statusCode int, message ...interface{}) error {
+func (in Instance) WrapHTTP(ctx context.Context, err error, code, action string, statusCode int, message ...interface{}) error {
 	if action != "" {
 		ctx = SetAction(ctx, action)
 	}
@@ -531,7 +531,7 @@ func (in *Instance) WrapHTTP(ctx context.Context, err error, code, action string
 func WrapHTTPf(ctx context.Context, err error, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
 	return global.WrapHTTPf(ctx, err, code, action, statusCode, message, messageArgs...)
 }
-func (in *Instance) WrapHTTPf(ctx context.Context, err error, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
+func (in Instance) WrapHTTPf(ctx context.Context, err error, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
 	if action != "" {
 		ctx = SetAction(ctx, action)
 	}
