@@ -8,8 +8,9 @@ New(f) and Wrap(f)
 
 Creating a new error or wrapping an error are as simple as:
 	ctxerr.New(ctx, "<code>", "<message>")
-	ctxerr.Newf(ctx, "<code>", "%s", "<message>")
+	ctxerr.Newf(ctx, "<code>", "%s", "<vars>")
 	ctxerr.Wrap(ctx, err, "<code>", "<message>")
+	ctxerr.Wrapf(ctx, err, "<code>", "%s", "<var>")
 
 A quick wrap function is available to avoid needing to create unused codes and messages.
 This function calls Wrap with an empty string for the code no message.
@@ -64,14 +65,18 @@ Note: If you are not adding a custom logging hook it may be useful to add the de
 	ctxerr.AddHandleHook(metricOnError)
 	ctxerr.AddHandleHook(DefaultLogHook)
 
-
-HTTP
-
 There is an http subpackage for handling HTTP errors.
 The function included returns a standardized struct filled in with details of the error.
 There are fields key constansts to help with this.
 	ctx = ctxerr.SetHTTPStatusCode(ctx, http.StatusBadRequest)
 	ctx = ctxerr.SetAction(ctx, "action for a user to understand how to fix the error if they can")
+An "Action" is a user facing error that a user can take an action on to fix.
+There are helper http functions that set the status code and action in one call.
+	ctxerr.NewHTTP(ctx, "<code>", "<action>", http.StatusBadRequest, "<message>")
+	ctxerr.NewHTTPf(ctx, "<code>", "<action>", http.StatusConflict, "%s", "<vars>")
+	ctxerr.WrapHTTP(ctx, err, "<code>", "<action>", http.StatusBadRequest, "<message>")
+	ctxerr.WrapHTTPf(ctx, err, "<code>", "<action>", http.StatusBadRequest, "%s", "<vars>")
+
 */
 package ctxerr
 
