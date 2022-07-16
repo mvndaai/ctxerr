@@ -171,6 +171,9 @@ func TestStatusCodeAndResponse(t *testing.T) {
 			if v := r.Error.Message; v != test.expectedMessage {
 				t.Error("Message did not match", v, test.expectedMessage)
 			}
+			if v := r.Error.TraceID; v != test.expectedTraceID {
+				t.Error("TraceID did not match", v, test.expectedTraceID)
+			}
 
 			// Ignore location field in test
 			delete(r.Error.Fields, ctxerr.FieldKeyLocation)

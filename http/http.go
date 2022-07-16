@@ -116,5 +116,5 @@ func StatusCodeAndResponse(err error, showMessage, showFields bool) (int, ErrorR
 	return statusCode, r
 }
 
-// Deprecated: TraceID is deprecated and will be removed eventually use FieldKeyTraceID instead
+// Deprecated: TraceID is deprecated use FieldKeyTraceID instead
 var TraceID = func(ctx context.Context) string { return "" }
