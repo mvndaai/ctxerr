@@ -11,7 +11,6 @@ import (
 )
 
 func TestStatusCodeAndResponse(t *testing.T) {
-
 	defaultStatusCode := 500
 	happyCode := "code"
 	happyMessage := "message"
