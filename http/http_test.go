@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/mvndaai/ctxerr"
-	"github.com/mvndaai/ctxerr/http"
+	ctxerrhttp "github.com/mvndaai/ctxerr/http"
 )
 
 func TestStatusCodeAndResponse(t *testing.T) {
@@ -25,6 +25,7 @@ func TestStatusCodeAndResponse(t *testing.T) {
 		expectedStatusCode int
 		expectedCode       string
 		expectedAction     string
+		expectedTraceID    string
 		expectedMessage    string
 		expectedFields     map[string]interface{}
 		expectedWarnings   bool
@@ -129,11 +130,34 @@ func TestStatusCodeAndResponse(t *testing.T) {
 			expectedStatusCode: 500,
 			expectedCode:       happyCode,
 		},
+		{
+			name: "traceID field",
+			err: func() error {
+				ctx := ctxerr.SetField(context.Background(), ctxerrhttp.FieldKeyTraceID, "traceID")
+				return ctxerr.New(ctx, happyCode, happyMessage)
+			}(),
+			expectedStatusCode: 500,
+			expectedCode:       happyCode,
+			expectedTraceID:    "traceID",
+			expectedFields:     nil,
+		},
+		{
+			name: "ctxerr.WrapHTTP",
+			err: func() error {
+				ctx := context.Background()
+				err := ctxerr.NewHTTP(ctx, "", "action", 0, "new")
+				return ctxerr.WrapHTTP(ctx, err, happyCode, "", 404, "wrap")
+			}(),
+
+			expectedStatusCode: 404,
+			expectedCode:       happyCode,
+			expectedAction:     "action",
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			sc, r := http.StatusCodeAndResponse(test.err, test.showMessage, test.showFields)
+			sc, r := ctxerrhttp.StatusCodeAndResponse(test.err, test.showMessage, test.showFields)
 
 			if sc != test.expectedStatusCode {
 				t.Error("Status code did not match", sc, test.expectedStatusCode)

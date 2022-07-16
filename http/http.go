@@ -41,6 +41,8 @@ import (
 	"github.com/mvndaai/ctxerr"
 )
 
+const FieldKeyTraceID = "traceID"
+
 type (
 	// ErrorResponse is the default HTTP response
 	ErrorResponse struct {
@@ -82,6 +84,11 @@ func StatusCodeAndResponse(err error, showMessage, showFields bool) (int, ErrorR
 			r.Error.Action = action.(string)
 			delete(fields, ctxerr.FieldKeyAction)
 		}
+		if traceID, ok := fields[FieldKeyTraceID]; ok {
+			r.Error.TraceID = traceID.(string)
+			delete(fields, FieldKeyTraceID)
+		}
+
 		if sci, ok := fields[ctxerr.FieldKeyStatusCode]; ok {
 			switch v := sci.(type) {
 			case int:
@@ -109,5 +116,5 @@ func StatusCodeAndResponse(err error, showMessage, showFields bool) (int, ErrorR
 	return statusCode, r
 }
 
-// TraceID is a configurable function to get a traceID from the context.
+// Deprecated: TraceID is deprecated and will be removed eventually use FieldKeyTraceID instead
 var TraceID = func(ctx context.Context) string { return "" }
