@@ -1,138 +1,65 @@
-# ctxerr
-
-[![DOC](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/mvndaai/ctxerr)
-[![Build
-Status](https://travis-ci.org/mvndaai/ctxerr.svg?branch=master)](https://travis-ci.org/mvndaai/ctxerr/)
-
-Go package for handling errors with extra context.
+# ctxerr <span style='float: right;'>[![doc](https://img.shields.io/github/v/tag/mvndaai/ctxerr?include_prereleases&label=godoc&sort=semver)](https://pkg.go.dev/github.com/mvndaai/ctxerr)</span>
 
 
-There are many ways to use the package and much more configuration in the godoc so please read it.
+Go package for adding extra context to errors.
 
 
-# Example HTTP Server
-Here is a basic example on how it can be used in an HTTP package
-
-The code below would make sure that all errors are logged and displayed in the same way.
-
-## Code
+This implementaton of the [`error` interface](https://pkg.go.dev/builtin#error) adds fields (i.e. `map[string]interface{}`) to a `context.Context` and attaches that to the returned error. There are a few fields defined by this package but most
 
 ```golang
-import (
-    ...
-    "github.com/mvndaai/ctxerr"
-    ch "github.com/mvndaai/ctxerr/http"
-)
-
-func handleError(w http.ResponseWriter, err error) {
-    statusCode, response := ch.StatusCodeAndResponse(err, config.ShowErrorMessage, config.ShowErrorFields)
-	w.WriteHeader(statusCode)
-    w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+if err != nil {
+    ctx = ctxerr.SetField(ctx, "field", "value")
+    return ctxerr.Wrap(ctx, err, "ERROR_CODE", "message")
 }
+```
 
+If you pass the context through your functions then fields can be added when the the data first appears and are automatically available in deeper functions.
 
-func handler(w http.ResponseWriter, r *http.Request) {
-    ctx := r.Context()
-    ...
-    if err := userPermitted(ctx, user) err != nil {
-        handleError(w, ctxerr.QuickWrap(ctx, err))
+## Example of basic usage
+
+In this example, even though `params` are set in a the top function, `foo`, they are available even in the `err` returned by the deepest function, `baz`.
+
+```golang
+func foo(req request) {
+    ctx := req.Context()
+    ctx = ctxerr.SetField(ctx, "params", req.Params)
+
+    if err := baz(ctx); err != nil {
+        err = ctxerr.QuickWrap(ctx, err)
+        ctxerr.Handle(err)
         return
     }
-
-    if err := dbLookup(ctx, key); err != nil {
-        handleError(w, ctxerr.QuickWrap(ctx, err))
-        return
-    }
-    ...
 }
 
-
-func checkPermission(ctx context.Context, u user, permission string) error {
-    if !u.HasPermission(permission) {
-        ctx = ctxerr.SetField(ctx, "permission", permission)
-        return ctxerr.New(ctx, "error_code_0", "permission not found")
-    }
+func bar(ctx context.Context) error {
+    // If err == nil; (Quick)Wrap will return nil
+    return ctxerr.QuickWrap(ctx, baz(ctx))
 }
 
-
-func userPermitted(ctx context.Context u user) error {
-    ...
-    for _, p := range permissions {
-        if err := checkPermission(ctx, u, permission); err != nil {
-            ctx = ctxerr.SetHTTPStatusCode(ctx, http.StatusUnauthorized)
-            ctx = ctxerr.SetAction(ctx, fmt.Sprintf("Please request permission '%s' from an admin", permission))
-            return ctxerr.QuickWrap(ctx, err)
-        }
-    }
-    return nil
-}
-
-
-func dbLookup(ctx context.Context, key string) (string, error) {
-    ctx = ctxerr.SetFields(ctx, "key", key)
-    if !db.Has(key) {
-        ctx = ctxerr.SetHTTPStatusCode(ctx, http.StatusNotFound)
-        return "", ctxerr.New(ctx, "error_code_1", "key not found in db")
-    }
-
-    value, err := db.Get(key)
-    if err != nil {
-        return "", ctxerr.Wrap(ctx, err, "error_code_2", "db get error")
-    }
+func baz(ctx context.Context) error {
+    return ctxerr.New(ctx, "NOT_IMPLEMENTED", "function not implemented")
 }
 ```
 
-## Responses
-Given default configuration here is what could be returned.
+## HTTP
+
+There are helper functions `NewHTTP` and `WrapHTTP` that set fields inline for a status code and an 'action'. Actions are what this package calls external user facing messages. They are the onces that can be shown to users without revealing internal details of your application.
+
+There is a subpackage [ctxerr/http](https://pkg.go.dev/github.com/mvndaai/ctxerr/http) that simplifies returning error JSON to an http request.
 
 
-### Missing permission
-
-Status code `401`
-
-HTTP response
-```json
-{
-	"error": {
-		"code" : "error_code_0",
-		"action" : "Please request permission 'view' from an admin",
-	}
-}
-```
-
-Log
-> handler : userPermitted : permission not found - {"permission": "view", ... }
-
-### Missing Key
-
-Status code `404`
-
-HTTP response
-```json
-{
-	"error": {
-		"code" : "error_code_1",
-	}
-}
-```
-
-Log
-> handler : dbLookup : key not found in db - {"key": "key", ... }
 
 
-### DB Get Error
+## Handle
 
-Status code `500`
+Errors should [only be handled once](https://dave.cheney.net/practical-go/presentations/qcon-china.html#_only_handle_an_error_once). Rather than calling `log` at the topmost return call `ctxerr.Handle(err)` so all errors can be handled in the same way. This is especially helpful in `go func()` and `defer func()`.
 
-HTTP response
-```json
-{
-	"error": {
-		"code" : "error_code_2",
-	}
-}
-```
+## Hooks
 
-Log
-> handler : dbLookup : db get error : *wrapped error* - {"key": "key", ... }
+Configuration is done through hooks.
+
+[`AddCreateHook`](https://pkg.go.dev/github.com/mvndaai/ctxerr#AddCreateHook) adds hooks that are run on ever `New` or `(Quick)Wrap`. Builtin hooks add the error code and a location of the error to the context.
+
+[`AddHandleHook`](https://pkg.go.dev/github.com/mvndaai/ctxerr#AddHandleHook) adds hooks that are run on `Handle`. If no hooks exist it will run a [default log hook](https://pkg.go.dev/github.com/mvndaai/ctxerr#Instance.DefaultLogHook). Use this to create a hook to log consistently however you want or even create a metric on each error by code.
+
+Common configurations might be available in the packages under [ctxerrhelper](https://github.com/mvndaai/ctxerrhelper). There each package has its own `go.mod` file to avoid adding extra dependencies to your service.

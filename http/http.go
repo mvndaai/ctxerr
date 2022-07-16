@@ -11,25 +11,6 @@ Use StatusCodeAndResponse(...) in HTTP handlers to return a common JSON response
 			"fields" : {},
 		}
 	}
-
-
-If you are using net/http:
-	if err != nil {
-		statusCode, response := StatusCodeAndResponse(err, config.ShowErrorMessage, config.ShowErrorFields)
-		w.WriteHeader(statusCode)
-		b, err := json.Marshal(response)
-		if err != nil {
-			ctxerr.LogError(err)
-		}
-		w.Write(response)
-		return
-	}
-
-If you are using echo:
-	if err != nil {
-		statusCode, response := StatusCodeAndResponse(err, config.ShowErrorMessage, config.ShowErrorFields)
-		return c.JSON(statusCode, response)
-	}
 */
 package http
 
