@@ -3,10 +3,10 @@ Package ctxerr is a way of creating and handling errors with extra context.
 
 Note: Errors can be wrapped as many times as wanted but should only be handled once!
 
-
 New(f) and Wrap(f)
 
 Creating a new error or wrapping an error are as simple as:
+
 	ctxerr.New(ctx, "<code>", "<message>")
 	ctxerr.Newf(ctx, "<code>", "%s", "<vars>")
 	ctxerr.Wrap(ctx, err, "<code>", "<message>")
@@ -14,15 +14,16 @@ Creating a new error or wrapping an error are as simple as:
 
 A quick wrap function is available to avoid needing to create unused codes and messages.
 This function calls Wrap with an empty string for the code no message.
+
 	ctxerr.QuickWrap(ctx, err)
 
 Note: Wrapping nil will return nil.
 
-
-Context
+# Context
 
 A context is passed in so that anywhere in code more information can be added.
 Adding information (aka fields) to a context is done by:
+
 	ctx = ctxerr.SetField(ctx, "field", "value")
 	ctx = ctxerr.SetFields(ctx, map[string]interface{}{"foo": "bar", "baz": 0})
 
@@ -32,18 +33,18 @@ See the HTTP section below for more examples.
 
 The function 'Fields' allows retrieving the fields added to the context.
 Using this for goroutines ensures all the data gets propagated.
+
 	nctx := ctxerr.SetFields(context.Background(), ctxerr.Fields(ctx))
 	go foo(nctx)
 
-
-Handle
+# Handle
 
 Handle exists to make sure all errors are handled in the say way.
 It should be called only once at the top of all wrapped errors.
 It will run through all hooks added through configuration or fallback to the DefaultLogHook.
 
-
 (i.e. HTTP handle functions or goroutines)
+
 	nctx := ctxerr.SetFields(context.Background(), ctxerr.Fields(ctx))
 	go func(ctx context.Context){
 		if err := foo(ctx) {
@@ -52,31 +53,34 @@ It will run through all hooks added through configuration or fallback to the Def
 		}
 	}(nctx)
 
-
-Configuration
+# Configuration
 
 Hooks can be used to edit the context before creating the error and to handle the error.
 
 If you need the context to change prior to creation of the error use 'AddCreateHook'.
+
 	ctxerr.AddCreateHook(customHook)
 
 To change how errors are handled use 'AddHandleHook'.
 Note: If you are not adding a custom logging hook it may be useful to add the default.
+
 	ctxerr.AddHandleHook(metricOnError)
 	ctxerr.AddHandleHook(DefaultLogHook)
 
 There is an http subpackage for handling HTTP errors.
 The function included returns a standardized struct filled in with details of the error.
 There are fields key constansts to help with this.
+
 	ctx = ctxerr.SetHTTPStatusCode(ctx, http.StatusBadRequest)
 	ctx = ctxerr.SetAction(ctx, "action for a user to understand how to fix the error if they can")
+
 An "Action" is a user facing error that a user can take an action on to fix.
 There are helper http functions that set the status code and action in one call.
+
 	ctxerr.NewHTTP(ctx, "<code>", "<action>", http.StatusBadRequest, "<message>")
 	ctxerr.NewHTTPf(ctx, "<code>", "<action>", http.StatusConflict, "%s", "<vars>")
 	ctxerr.WrapHTTP(ctx, err, "<code>", "<action>", http.StatusBadRequest, "<message>")
 	ctxerr.WrapHTTPf(ctx, err, "<code>", "<action>", http.StatusBadRequest, "%s", "<vars>")
-
 */
 package ctxerr
 
@@ -267,6 +271,9 @@ func QuickWrap(ctx context.Context, err error) error {
 
 // Fields retrieves the fields from the context
 func Fields(ctx context.Context) map[string]interface{} {
+	if ctx == nil {
+		return nil
+	}
 	fi := ctx.Value(FieldsKey)
 	if fi == nil {
 		return nil
@@ -299,7 +306,7 @@ func SetFields(ctx context.Context, fields map[string]interface{}) context.Conte
 	return context.WithValue(ctx, FieldsKey, f)
 }
 
-//CallerFunc gets the name of the calling function
+// CallerFunc gets the name of the calling function
 func CallerFunc(skip int) string {
 	f := "caller location unretrievable"
 	if pc, _, _, ok := runtime.Caller(skip + 1); ok {

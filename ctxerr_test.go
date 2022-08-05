@@ -833,3 +833,11 @@ func TestImpl(t *testing.T) {
 		t.Error("expected no code got", code)
 	}
 }
+
+func TestFeildsWithNilCtx(t *testing.T) {
+	var ctx context.Context
+	f := ctxerr.Fields(ctx)
+	if f != nil {
+		t.Error("expected a nil map")
+	}
+}
