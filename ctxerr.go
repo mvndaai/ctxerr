@@ -511,7 +511,7 @@ func (in Instance) NewHTTP(ctx context.Context, code, action string, statusCode 
 	if statusCode != 0 {
 		ctx = SetHTTPStatusCode(ctx, statusCode)
 	}
-	return New(ctx, code, message...)
+	return in.New(ctx, code, message...)
 }
 
 // Newf creates a new error  with action and status code and message formatting
@@ -525,7 +525,7 @@ func (in Instance) NewHTTPf(ctx context.Context, code, action string, statusCode
 	if statusCode != 0 {
 		ctx = SetHTTPStatusCode(ctx, statusCode)
 	}
-	return Newf(ctx, code, message, messageArgs...)
+	return in.Newf(ctx, code, message, messageArgs...)
 }
 
 // Wrap creates a new error with action and status code and another wrapped under it
@@ -539,7 +539,7 @@ func (in Instance) WrapHTTP(ctx context.Context, err error, code, action string,
 	if statusCode != 0 {
 		ctx = SetHTTPStatusCode(ctx, statusCode)
 	}
-	return Wrap(ctx, err, code, message...)
+	return in.Wrap(ctx, err, code, message...)
 }
 
 // Wrapf creates a new error  with action and status code and a formatted message with another wrapped under it
@@ -553,5 +553,5 @@ func (in Instance) WrapHTTPf(ctx context.Context, err error, code, action string
 	if statusCode != 0 {
 		ctx = SetHTTPStatusCode(ctx, statusCode)
 	}
-	return Wrapf(ctx, err, code, message, messageArgs...)
+	return in.Wrapf(ctx, err, code, message, messageArgs...)
 }
