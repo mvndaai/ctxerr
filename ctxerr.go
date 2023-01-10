@@ -126,9 +126,9 @@ const (
 	FieldKeyStatusCode = "error_status_code"
 	// FieldKeyAction is an action that a user can take to fix the error
 	FieldKeyAction = "error_action"
-	//FieldKeyCategory can be used with IsCategorgy(...) to determin a category of error
+	// FieldKeyCategory can be used with IsCategorgy(...) to determin a category of error
 	FieldKeyCategory = "error_category"
-	//FieldKeyLocation shows the file location of the err
+	// FieldKeyLocation shows the file location of the err
 	FieldKeyLocation = "error_location"
 )
 
@@ -266,7 +266,10 @@ func (in Instance) Wrapf(ctx context.Context, err error, code, message string, m
 
 // QuickWrap will wrap an error with an empty code and the calling function's name as the message
 func QuickWrap(ctx context.Context, err error) error {
-	return Wrap(ctx, err, "", nil)
+	return global.Wrap(ctx, err, "", nil)
+}
+func (in Instance) QuickWrap(ctx context.Context, err error) error {
+	return in.Wrap(ctx, err, "", nil)
 }
 
 // Fields retrieves the fields from the context
@@ -514,7 +517,7 @@ func (in Instance) NewHTTP(ctx context.Context, code, action string, statusCode 
 	return in.New(ctx, code, message...)
 }
 
-// Newf creates a new error  with action and status code and message formatting
+// NewHTTPf creates a new error  with action and status code and message formatting
 func NewHTTPf(ctx context.Context, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
 	return global.NewHTTPf(ctx, code, action, statusCode, message, messageArgs...)
 }
@@ -528,7 +531,7 @@ func (in Instance) NewHTTPf(ctx context.Context, code, action string, statusCode
 	return in.Newf(ctx, code, message, messageArgs...)
 }
 
-// Wrap creates a new error with action and status code and another wrapped under it
+// WrapHTTP creates a new error with action and status code and another wrapped under it
 func WrapHTTP(ctx context.Context, err error, code, action string, statusCode int, message ...interface{}) error {
 	return global.WrapHTTP(ctx, err, code, action, statusCode, message...)
 }
@@ -542,7 +545,7 @@ func (in Instance) WrapHTTP(ctx context.Context, err error, code, action string,
 	return in.Wrap(ctx, err, code, message...)
 }
 
-// Wrapf creates a new error  with action and status code and a formatted message with another wrapped under it
+// WrapHTTPf creates a new error with action and status code and a formatted message with another wrapped under it
 func WrapHTTPf(ctx context.Context, err error, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
 	return global.WrapHTTPf(ctx, err, code, action, statusCode, message, messageArgs...)
 }
