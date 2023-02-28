@@ -74,6 +74,20 @@ func TestNil(t *testing.T) {
 		var in *ctxerr.Instance
 		in.AddHandleHook(ctxerr.DefaultLogHook)
 	}()
+
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				if !strings.HasSuffix(fmt.Sprint(r), "ctxerr.Instance is nil") {
+					t.Error("recovered with wrong message:", r)
+				}
+			} else {
+				t.Error("expected to recover")
+			}
+		}()
+		var in *ctxerr.Instance
+		in.AddFieldHook(func(v any) any { return v })
+	}()
 }
 
 func TestOverall(t *testing.T) {
@@ -249,6 +263,14 @@ func TestQuickWrap(t *testing.T) {
 			name: "ctxerr",
 			err: func(ctx context.Context) error {
 				return ctxerr.QuickWrap(ctx, ctxerr.New(ctx, "code", "ctxerr"))
+			},
+			expectedMessage: "ctxerr",
+			expectedCode:    "code",
+		}, {
+			name: "ctxerr instance",
+			err: func(ctx context.Context) error {
+				in := ctxerr.NewInstance()
+				return in.QuickWrap(ctx, ctxerr.New(ctx, "code", "ctxerr"))
 			},
 			expectedMessage: "ctxerr",
 			expectedCode:    "code",
@@ -840,4 +862,67 @@ func TestFeildsWithNilCtx(t *testing.T) {
 	if f != nil {
 		t.Error("expected a nil map")
 	}
+}
+
+type redactable string
+
+func (r redactable) Redact() any {
+	return "redacted"
+}
+
+type IRedactable interface {
+	Redact() any
+}
+
+func RedactItem(a any) any {
+	if v, ok := a.(IRedactable); ok {
+		return v.Redact()
+	}
+	return a
+}
+
+func TestFieldHook(t *testing.T) {
+	in := ctxerr.Instance{}
+	in.AddFieldHook(RedactItem)
+
+	var key = "key"
+	tests := []struct {
+		name string
+		f    func(context.Context, any) context.Context
+	}{
+		{
+			name: "in.SetField",
+			f: func(ctx context.Context, v any) context.Context {
+				return in.SetField(ctx, key, v)
+			},
+		},
+		{
+			name: "in.SetFields",
+			f: func(ctx context.Context, v any) context.Context {
+				return in.SetFields(ctx, map[string]any{key: v})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := redactable("hello")
+
+			ctx := context.Background()
+			ctx = tt.f(ctx, r)
+
+			v, ok := ctxerr.Fields(ctx)[key]
+			if !ok {
+				t.Fatal("key not set")
+			}
+
+			if v != "redacted" {
+				t.Error("hook did not work", v)
+			}
+		})
+	}
+}
+
+func TestGlobalFieldsHook(t *testing.T) {
+	ctxerr.AddFieldHook(func(a any) any { return a })
 }
