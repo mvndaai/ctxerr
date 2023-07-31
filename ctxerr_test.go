@@ -86,7 +86,7 @@ func TestNil(t *testing.T) {
 			}
 		}()
 		var in *ctxerr.Instance
-		in.AddFieldHook(func(v any) any { return v })
+		in.AddFieldHook(func(_ context.Context, v any) any { return v })
 	}()
 }
 
@@ -874,7 +874,7 @@ type IRedactable interface {
 	Redact() any
 }
 
-func RedactItem(a any) any {
+func RedactItem(ctx context.Context, a any) any {
 	if v, ok := a.(IRedactable); ok {
 		return v.Redact()
 	}
@@ -924,5 +924,5 @@ func TestFieldHook(t *testing.T) {
 }
 
 func TestGlobalFieldsHook(t *testing.T) {
-	ctxerr.AddFieldHook(func(a any) any { return a })
+	ctxerr.AddFieldHook(func(_ context.Context, a any) any { return a })
 }
