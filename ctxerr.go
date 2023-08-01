@@ -108,7 +108,7 @@ type Instance struct {
 	// HandleHooks are functions that run on ctxerr.Handle
 	HandleHooks []func(error)
 	// FieldHooks are functions that run on ctxerr.SetField(s)
-	FieldHooks []func(any) any
+	FieldHooks []func(context.Context, any) any
 	// FieldsAsSlice are keys that get gathered as a slice in ctxerr.AllFields
 	FieldsAsSlice []string
 }
@@ -123,7 +123,7 @@ func NewInstance() Instance {
 	// Gather keys like location as slice instead of just the deepest value
 	in.FieldsAsSlice = []string{FieldKeyLocation}
 	// No built in hooks
-	in.FieldHooks = []func(any) any{}
+	in.FieldHooks = []func(context.Context, any) any{}
 	return in
 }
 
@@ -184,8 +184,8 @@ func (in *Instance) AddHandleHook(f func(error)) {
 }
 
 // AddFieldHooks adds a hook to be run on handling of an error
-func AddFieldHook(f func(any) any) { global.AddFieldHook(f) }
-func (in *Instance) AddFieldHook(f func(any) any) {
+func AddFieldHook(f func(context.Context, any) any) { global.AddFieldHook(f) }
+func (in *Instance) AddFieldHook(f func(context.Context, any) any) {
 	if in == nil {
 		// cannot return an error so adding info to panic
 		panic("cannot call AddFieldHooks because ctxerr.Instance is nil")
@@ -310,7 +310,7 @@ func SetField(ctx context.Context, key string, value interface{}) context.Contex
 }
 func (in Instance) SetField(ctx context.Context, key string, value interface{}) context.Context {
 	for _, f := range in.FieldHooks {
-		value = f(value)
+		value = f(ctx, value)
 	}
 	f := map[string]interface{}{}
 	for k, v := range Fields(ctx) {
@@ -331,7 +331,7 @@ func (in Instance) SetFields(ctx context.Context, fields map[string]interface{})
 	}
 	for k, v := range fields {
 		for _, f := range in.FieldHooks {
-			v = f(v)
+			v = f(ctx, v)
 		}
 		f[k] = v
 	}
