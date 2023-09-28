@@ -111,6 +111,8 @@ type Instance struct {
 	FieldHooks []func(context.Context, any) any
 	// FieldsAsSlice are keys that get gathered as a slice in ctxerr.AllFields
 	FieldsAsSlice []string
+	// GetFieldsFuncs are functions that get the fieldss from an error
+	GetFieldsFuncs []func(error) map[string]any
 }
 
 // NewInstance creates a local instance with the default create hooks
@@ -124,6 +126,8 @@ func NewInstance() Instance {
 	in.FieldsAsSlice = []string{FieldKeyLocation}
 	// No built in hooks
 	in.FieldHooks = []func(context.Context, any) any{}
+	// Functions for getting the fields
+	in.GetFieldsFuncs = append(in.GetFieldsFuncs, DefaultFieldsFunc)
 	return in
 }
 
@@ -191,6 +195,16 @@ func (in *Instance) AddFieldHook(f func(context.Context, any) any) {
 		panic("cannot call AddFieldHooks because ctxerr.Instance is nil")
 	}
 	in.FieldHooks = append(in.FieldHooks, f)
+}
+
+// AddFieldsFuncs adds a function that can be used to get fields from an error
+func AddFieldsFuncs(f func(error) map[string]any) { global.AddFieldsFuncs(f) }
+func (in *Instance) AddFieldsFuncs(f func(error) map[string]any) {
+	if in == nil {
+		// cannot return an error so adding info to panic
+		panic("cannot call AddFieldsFuncs because ctxerr.Instance is nil")
+	}
+	in.GetFieldsFuncs = append(in.GetFieldsFuncs, f)
 }
 
 // FieldsGetter is an interface for getting fields
@@ -365,16 +379,22 @@ func CallerFunc(skip int) string {
 func AllFields(err error) map[string]interface{} { return global.AllFields(err) }
 func (in Instance) AllFields(err error) map[string]interface{} {
 	f := map[string]interface{}{}
-	var e FieldsGetter = &impl{}
 	for {
 		if err == nil {
 			return f
 		}
-		if ok := errors.As(err, &e); !ok {
-			return f
+		feildFuncs := append([]func(error) map[string]any{}, in.GetFieldsFuncs...)
+		if len(feildFuncs) == 0 {
+			feildFuncs = append(feildFuncs, DefaultFieldsFunc)
+		}
+		fields := map[string]any{}
+		for _, fn := range feildFuncs {
+			for k, v := range fn(err) {
+				fields[k] = v
+			}
 		}
 	OUTER:
-		for k, v := range e.Fields() {
+		for k, v := range fields {
 			for _, sk := range in.FieldsAsSlice {
 				if k == sk {
 					if _, ok := f[k]; !ok {
@@ -391,18 +411,26 @@ func (in Instance) AllFields(err error) map[string]interface{} {
 	}
 }
 
-// HasField unwraps and checks if the error has a field anywhere i
-func HasField(err error, field string) bool {
-	var e FieldsGetter = &impl{}
+// HasField unwraps and checks if the error has a field in the error tree
+func HasField(err error, field string) bool { return global.HasField(err, field) }
+func (in Instance) HasField(err error, field string) bool {
 	for {
 		if err == nil {
 			return false
 		}
-		if ok := errors.As(err, &e); !ok {
-			return false
+
+		feildFuncs := append([]func(error) map[string]any{}, in.GetFieldsFuncs...)
+		if len(feildFuncs) == 0 {
+			feildFuncs = append(feildFuncs, DefaultFieldsFunc)
+		}
+		fields := map[string]any{}
+		for _, fn := range feildFuncs {
+			for k, v := range fn(err) {
+				fields[k] = v
+			}
 		}
 
-		if _, ok := e.Fields()[field]; ok {
+		if _, ok := fields[field]; ok {
 			return true
 		}
 
@@ -425,17 +453,25 @@ func As(err error) (CtxErr, bool) {
 }
 
 // HasCategory tells if an error in the chain matches the category
-func HasCategory(err error, category interface{}) bool {
-	var e FieldsGetter = &impl{}
+func HasCategory(err error, category interface{}) bool { return global.HasCategory(err, category) }
+func (in Instance) HasCategory(err error, category interface{}) bool {
 	for {
 		if err == nil {
 			return false
 		}
-		if ok := errors.As(err, &e); !ok {
-			return false
+
+		feildFuncs := append([]func(error) map[string]any{}, in.GetFieldsFuncs...)
+		if len(feildFuncs) == 0 {
+			feildFuncs = append(feildFuncs, DefaultFieldsFunc)
+		}
+		fields := map[string]any{}
+		for _, fn := range feildFuncs {
+			for k, v := range fn(err) {
+				fields[k] = v
+			}
 		}
 
-		if c, ok := e.Fields()[FieldKeyCategory]; ok {
+		if c, ok := fields[FieldKeyCategory]; ok {
 			if c == category {
 				return true
 			}
@@ -526,6 +562,14 @@ func (in Instance) DefaultLogHook(err error) {
 		fields = fmt.Sprintf("fields '%v' could not be marshalled as JSON: %s", f, merr)
 	}
 	log.Printf("%s - %s", err, fields)
+}
+
+// DefaultFieldsFunc is the default function to get feilds from an error
+func DefaultFieldsFunc(err error) map[string]any {
+	if v, ok := err.(FieldsGetter); ok {
+		return v.Fields()
+	}
+	return nil
 }
 
 // SetCodeHook takes the code and adds it to the context

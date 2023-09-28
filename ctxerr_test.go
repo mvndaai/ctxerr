@@ -1004,3 +1004,62 @@ func TestAllFieldsWithMultipleTypesOfErrors(t *testing.T) {
 		t.Error("missing category1")
 	}
 }
+
+type OtherFieldFuncError struct {
+	fields map[string]any
+	err    error
+}
+
+func (offe OtherFieldFuncError) Error() string {
+	return offe.err.Error()
+}
+
+func (offe OtherFieldFuncError) FieldsMap() map[string]any {
+	return offe.fields
+}
+
+func (offe OtherFieldFuncError) Unwrap() error {
+	return errors.Unwrap(offe.err)
+}
+
+type IFieldsMap interface {
+	FieldsMap() map[string]any
+}
+
+func NewOtherFieldFuncError(msg string, fields map[string]any) error {
+	return OtherFieldFuncError{
+		fields: fields,
+		err:    fmt.Errorf(msg),
+	}
+}
+
+func TestAddFieldsFuncs(t *testing.T) {
+	in := ctxerr.NewInstance()
+	in.AddFieldsFuncs(func(err error) map[string]any {
+		if v, ok := err.(IFieldsMap); ok {
+			return v.FieldsMap()
+		}
+		return nil
+	})
+
+	err := NewOtherFieldFuncError("msg", map[string]any{"a": "a"})
+	if in.AllFields(err)["a"] != "a" {
+		t.Error("field not set from interface")
+	}
+
+	err = ctxerr.New(ctxerr.SetField(context.Background(), "b", "b"), "CODE", "msg")
+	if in.AllFields(err)["b"] != "b" {
+		t.Error("field not set from default interface")
+	}
+
+	// Ensure empty funcs defaults
+	in.GetFieldsFuncs = nil
+	err = ctxerr.New(ctxerr.SetField(context.Background(), "c", "c"), "CODE", "msg")
+	if in.AllFields(err)["c"] != "c" {
+		t.Error("field not set from default interface fallback")
+	}
+}
+
+func TestGlobaTestAddFieldsFuncs(t *testing.T) {
+	ctxerr.AddFieldsFuncs(func(_ error) map[string]any { return nil })
+}
