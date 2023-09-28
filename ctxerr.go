@@ -373,16 +373,18 @@ func CallerFunc(skip int) string {
 func AllFields(err error) map[string]interface{} { return global.AllFields(err) }
 func (in Instance) AllFields(err error) map[string]interface{} {
 	f := map[string]interface{}{}
+	fieldFuncs := append([]func(error) map[string]any{}, in.GetFieldsFuncs...)
+	if len(fieldFuncs) == 0 {
+		fieldFuncs = append(fieldFuncs, DefaultFieldsFunc)
+	}
+
 	for {
 		if err == nil {
 			return f
 		}
-		feildFuncs := append([]func(error) map[string]any{}, in.GetFieldsFuncs...)
-		if len(feildFuncs) == 0 {
-			feildFuncs = append(feildFuncs, DefaultFieldsFunc)
-		}
+
 		fields := map[string]any{}
-		for _, fn := range feildFuncs {
+		for _, fn := range fieldFuncs {
 			for k, v := range fn(err) {
 				fields[k] = v
 			}
@@ -408,17 +410,18 @@ func (in Instance) AllFields(err error) map[string]interface{} {
 // HasField unwraps and checks if the error has a field in the error tree
 func HasField(err error, field string) bool { return global.HasField(err, field) }
 func (in Instance) HasField(err error, field string) bool {
+	fieldFuncs := append([]func(error) map[string]any{}, in.GetFieldsFuncs...)
+	if len(fieldFuncs) == 0 {
+		fieldFuncs = append(fieldFuncs, DefaultFieldsFunc)
+	}
+
 	for {
 		if err == nil {
 			return false
 		}
 
-		feildFuncs := append([]func(error) map[string]any{}, in.GetFieldsFuncs...)
-		if len(feildFuncs) == 0 {
-			feildFuncs = append(feildFuncs, DefaultFieldsFunc)
-		}
 		fields := map[string]any{}
-		for _, fn := range feildFuncs {
+		for _, fn := range fieldFuncs {
 			for k, v := range fn(err) {
 				fields[k] = v
 			}
@@ -449,17 +452,18 @@ func As(err error) (CtxErr, bool) {
 // HasCategory tells if an error in the chain matches the category
 func HasCategory(err error, category interface{}) bool { return global.HasCategory(err, category) }
 func (in Instance) HasCategory(err error, category interface{}) bool {
+	fieldFuncs := append([]func(error) map[string]any{}, in.GetFieldsFuncs...)
+	if len(fieldFuncs) == 0 {
+		fieldFuncs = append(fieldFuncs, DefaultFieldsFunc)
+	}
+
 	for {
 		if err == nil {
 			return false
 		}
 
-		feildFuncs := append([]func(error) map[string]any{}, in.GetFieldsFuncs...)
-		if len(feildFuncs) == 0 {
-			feildFuncs = append(feildFuncs, DefaultFieldsFunc)
-		}
 		fields := map[string]any{}
-		for _, fn := range feildFuncs {
+		for _, fn := range fieldFuncs {
 			for k, v := range fn(err) {
 				fields[k] = v
 			}
