@@ -193,6 +193,12 @@ func (in *Instance) AddFieldHook(f func(context.Context, any) any) {
 	in.FieldHooks = append(in.FieldHooks, f)
 }
 
+// FieldsGetter is an interface for getting fields
+// This allows field methods to work other error structs without them needing to implement the entire CtxErr interface
+type FieldsGetter interface {
+	Fields() map[string]any
+}
+
 // CtxErr is the interface that should be checked in a errors.As function
 type CtxErr interface {
 	error
@@ -200,7 +206,7 @@ type CtxErr interface {
 	Is(error) bool
 	As(interface{}) bool
 
-	Fields() map[string]interface{}
+	FieldsGetter
 	Context() context.Context
 	WithContext(context.Context)
 }
@@ -359,7 +365,7 @@ func CallerFunc(skip int) string {
 func AllFields(err error) map[string]interface{} { return global.AllFields(err) }
 func (in Instance) AllFields(err error) map[string]interface{} {
 	f := map[string]interface{}{}
-	var e CtxErr = &impl{}
+	var e FieldsGetter = &impl{}
 	for {
 		if err == nil {
 			return f
@@ -387,7 +393,7 @@ func (in Instance) AllFields(err error) map[string]interface{} {
 
 // HasField unwraps and checks if the error has a field anywhere i
 func HasField(err error, field string) bool {
-	var e CtxErr = &impl{}
+	var e FieldsGetter = &impl{}
 	for {
 		if err == nil {
 			return false
@@ -420,26 +426,23 @@ func As(err error) (CtxErr, bool) {
 
 // HasCategory tells if an error in the chain matches the category
 func HasCategory(err error, category interface{}) bool {
-	if err == nil {
-		return false
-	}
-	var e CtxErr = &impl{}
-	if !errors.As(err, &e) {
-		return false
-	}
+	var e FieldsGetter = &impl{}
 	for {
+		if err == nil {
+			return false
+		}
+		if ok := errors.As(err, &e); !ok {
+			return false
+		}
+
 		if c, ok := e.Fields()[FieldKeyCategory]; ok {
 			if c == category {
 				return true
 			}
 		}
-		u := errors.Unwrap(e)
-		if errors.As(u, &e) {
-			continue
-		}
-		break
+
+		err = errors.Unwrap(err)
 	}
-	return false
 }
 
 /* Implementation helper code */

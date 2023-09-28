@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -925,4 +926,81 @@ func TestFieldHook(t *testing.T) {
 
 func TestGlobalFieldsHook(t *testing.T) {
 	ctxerr.AddFieldHook(func(_ context.Context, a any) any { return a })
+}
+
+type FieldError struct {
+	fields map[string]any
+	err    error
+}
+
+func (fe FieldError) Error() string {
+	return fe.err.Error()
+}
+
+func (fe FieldError) Fields() map[string]any {
+	return fe.fields
+}
+
+func (fe FieldError) Unwrap() error {
+	return errors.Unwrap(fe.err)
+}
+
+func NewFieldError(msg string, fields map[string]any) error {
+	return FieldError{
+		fields: fields,
+		err:    fmt.Errorf(msg),
+	}
+}
+
+func WrapFieldError(err error, msg string, fields map[string]any) error {
+	return FieldError{
+		fields: fields,
+		err:    fmt.Errorf("%s : %w", msg, err),
+	}
+}
+
+func TestAllFieldsWithMultipleTypesOfErrors(t *testing.T) {
+	var _ error = FieldError{}
+	var _ ctxerr.FieldsGetter = FieldError{}
+
+	err := NewFieldError("bottom", map[string]any{"a": "a"})
+	err = fmt.Errorf("fmt : %w", err)
+	ctx := ctxerr.SetField(context.Background(), "b", "b")
+	ctx = ctxerr.SetCategory(ctx, "category1")
+	err = ctxerr.Wrap(ctx, err, "CTXERR_CODE_1", "ctxerr1")
+	ctx = ctxerr.SetCategory(ctx, "category2")
+	err = ctxerr.Wrap(ctx, err, "CTXERR_CODE_2", "ctxerr2")
+	err = WrapFieldError(err, "wrapfe", map[string]any{"c": "c"})
+
+	expectedMessage := "wrapfe : ctxerr2 : ctxerr1 : fmt : bottom"
+	if msg := err.Error(); msg != expectedMessage {
+		t.Errorf("message didn't match \n'%s'\n'%s'", msg, expectedMessage)
+	}
+
+	f := ctxerr.AllFields(err)
+	expectedFields := map[string]any{
+		"a":              "a",
+		"b":              "b",
+		"c":              "c",
+		"error_code":     "CTXERR_CODE_1",
+		"error_category": "category1",
+		"error_location": []any{
+			"ctxerr_test.TestAllFieldsWithMultipleTypesOfErrors",
+			"ctxerr_test.TestAllFieldsWithMultipleTypesOfErrors",
+		},
+	}
+	if !reflect.DeepEqual(f, expectedFields) {
+		t.Errorf("fields didn't match \n%#v\n%#v", f, expectedFields)
+	}
+
+	if !ctxerr.HasField(err, "a") {
+		t.Error("missing in HasField")
+	}
+
+	if !ctxerr.HasCategory(err, "category2") {
+		t.Error("missing category2")
+	}
+	if !ctxerr.HasCategory(err, "category1") {
+		t.Error("missing category1")
+	}
 }
