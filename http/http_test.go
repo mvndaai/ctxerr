@@ -26,7 +26,7 @@ func TestStatusCodeAndResponse(t *testing.T) {
 		expectedAction     string
 		expectedTraceID    string
 		expectedMessage    string
-		expectedFields     map[string]interface{}
+		expectedFields     map[string]any
 		expectedWarnings   bool
 	}{
 		{

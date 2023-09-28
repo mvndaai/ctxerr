@@ -4,7 +4,7 @@
 Go package for adding extra context to errors.
 
 
-This implementaton of the [`error` interface](https://pkg.go.dev/builtin#error) adds fields (i.e. `map[string]interface{}`) to a `context.Context` and attaches that to the returned error. There are a few fields defined by this package but most
+This implementaton of the [`error` interface](https://pkg.go.dev/builtin#error) adds fields (i.e. `map[string]any`) to a `context.Context` and attaches that to the returned error. There are a few fields defined by this package but most
 
 ```golang
 if err != nil {
