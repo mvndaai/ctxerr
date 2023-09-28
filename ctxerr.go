@@ -198,19 +198,13 @@ func (in *Instance) AddFieldHook(f func(context.Context, any) any) {
 }
 
 // AddFieldsFuncs adds a function that can be used to get fields from an error
-func AddFieldsFuncs(f func(error) map[string]any) { global.AddFieldsFuncs(f) }
-func (in *Instance) AddFieldsFuncs(f func(error) map[string]any) {
+func AddFieldsFunc(f func(error) map[string]any) { global.AddFieldsFunc(f) }
+func (in *Instance) AddFieldsFunc(f func(error) map[string]any) {
 	if in == nil {
 		// cannot return an error so adding info to panic
 		panic("cannot call AddFieldsFuncs because ctxerr.Instance is nil")
 	}
 	in.GetFieldsFuncs = append(in.GetFieldsFuncs, f)
-}
-
-// FieldsGetter is an interface for getting fields
-// This allows field methods to work other error structs without them needing to implement the entire CtxErr interface
-type FieldsGetter interface {
-	Fields() map[string]any
 }
 
 // CtxErr is the interface that should be checked in a errors.As function
@@ -220,7 +214,7 @@ type CtxErr interface {
 	Is(error) bool
 	As(interface{}) bool
 
-	FieldsGetter
+	Fields() map[string]any
 	Context() context.Context
 	WithContext(context.Context)
 }
@@ -564,9 +558,11 @@ func (in Instance) DefaultLogHook(err error) {
 	log.Printf("%s - %s", err, fields)
 }
 
-// DefaultFieldsFunc is the default function to get feilds from an error
+// DefaultFieldsFunc is the default function to get fields from an error
 func DefaultFieldsFunc(err error) map[string]any {
-	if v, ok := err.(FieldsGetter); ok {
+	if v, ok := err.(interface {
+		Fields() map[string]any
+	}); ok {
 		return v.Fields()
 	}
 	return nil

@@ -89,6 +89,20 @@ func TestNil(t *testing.T) {
 		var in *ctxerr.Instance
 		in.AddFieldHook(func(_ context.Context, v any) any { return v })
 	}()
+
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				if !strings.HasSuffix(fmt.Sprint(r), "ctxerr.Instance is nil") {
+					t.Error("recovered with wrong message:", r)
+				}
+			} else {
+				t.Error("expected to recover")
+			}
+		}()
+		var in *ctxerr.Instance
+		in.AddFieldsFunc(func(error) map[string]any { return nil })
+	}()
 }
 
 func TestOverall(t *testing.T) {
@@ -961,7 +975,6 @@ func WrapFieldError(err error, msg string, fields map[string]any) error {
 
 func TestAllFieldsWithMultipleTypesOfErrors(t *testing.T) {
 	var _ error = FieldError{}
-	var _ ctxerr.FieldsGetter = FieldError{}
 
 	err := NewFieldError("bottom", map[string]any{"a": "a"})
 	err = fmt.Errorf("fmt : %w", err)
@@ -1035,7 +1048,7 @@ func NewOtherFieldFuncError(msg string, fields map[string]any) error {
 
 func TestAddFieldsFuncs(t *testing.T) {
 	in := ctxerr.NewInstance()
-	in.AddFieldsFuncs(func(err error) map[string]any {
+	in.AddFieldsFunc(func(err error) map[string]any {
 		if v, ok := err.(IFieldsMap); ok {
 			return v.FieldsMap()
 		}
@@ -1054,12 +1067,20 @@ func TestAddFieldsFuncs(t *testing.T) {
 
 	// Ensure empty funcs defaults
 	in.GetFieldsFuncs = nil
-	err = ctxerr.New(ctxerr.SetField(context.Background(), "c", "c"), "CODE", "msg")
+	ctx := ctxerr.SetField(context.Background(), "c", "c")
+	ctx = ctxerr.SetCategory(ctx, "foo")
+	err = ctxerr.New(ctx, "CODE", "msg")
 	if in.AllFields(err)["c"] != "c" {
 		t.Error("field not set from default interface fallback")
+	}
+	if !in.HasCategory(err, "foo") {
+		t.Error("missing category")
+	}
+	if !in.HasField(err, "c") {
+		t.Error("missing hasField")
 	}
 }
 
 func TestGlobaTestAddFieldsFuncs(t *testing.T) {
-	ctxerr.AddFieldsFuncs(func(_ error) map[string]any { return nil })
+	ctxerr.AddFieldsFunc(func(_ error) map[string]any { return nil })
 }
