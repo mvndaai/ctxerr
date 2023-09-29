@@ -146,7 +146,7 @@ const (
 
 // FieldsKey is the key used to add and decode fields on the context
 // Change or use it in other packages if you want to unify fields
-var FieldsKey interface{} = contextKey("fields")
+var FieldsKey any = contextKey("fields")
 
 // Handle should be called one per error to handle it when it can no logger be returned
 func Handle(err error) { global.Handle(err) }
@@ -212,7 +212,7 @@ type CtxErr interface {
 	error
 	Unwrap() error
 	Is(error) bool
-	As(interface{}) bool
+	As(any) bool
 
 	Fields() map[string]any
 	Context() context.Context
@@ -220,10 +220,10 @@ type CtxErr interface {
 }
 
 // New creates a new error
-func New(ctx context.Context, code string, message ...interface{}) error {
+func New(ctx context.Context, code string, message ...any) error {
 	return global.New(ctx, code, message...)
 }
-func (in Instance) New(ctx context.Context, code string, message ...interface{}) error {
+func (in Instance) New(ctx context.Context, code string, message ...any) error {
 	for _, hook := range in.CreateHooks {
 		ctx = hook(ctx, code, nil)
 	}
@@ -236,10 +236,10 @@ func (in Instance) New(ctx context.Context, code string, message ...interface{})
 }
 
 // Newf creates a new error message formatting
-func Newf(ctx context.Context, code, message string, messageArgs ...interface{}) error {
+func Newf(ctx context.Context, code, message string, messageArgs ...any) error {
 	return global.Newf(ctx, code, message, messageArgs...)
 }
-func (in Instance) Newf(ctx context.Context, code, message string, messageArgs ...interface{}) error {
+func (in Instance) Newf(ctx context.Context, code, message string, messageArgs ...any) error {
 	for _, hook := range in.CreateHooks {
 		ctx = hook(ctx, code, nil)
 	}
@@ -251,11 +251,11 @@ func (in Instance) Newf(ctx context.Context, code, message string, messageArgs .
 }
 
 // Wrap creates a new error with another wrapped under it
-func Wrap(ctx context.Context, err error, code string, message ...interface{}) error {
+func Wrap(ctx context.Context, err error, code string, message ...any) error {
 	return global.Wrap(ctx, err, code, message...)
 }
 
-func (in Instance) Wrap(ctx context.Context, err error, code string, message ...interface{}) error {
+func (in Instance) Wrap(ctx context.Context, err error, code string, message ...any) error {
 	if err == nil {
 		return nil
 	}
@@ -276,10 +276,10 @@ func (in Instance) Wrap(ctx context.Context, err error, code string, message ...
 }
 
 // Wrapf creates a new error with a formatted message with another wrapped under it
-func Wrapf(ctx context.Context, err error, code, message string, messageArgs ...interface{}) error {
+func Wrapf(ctx context.Context, err error, code, message string, messageArgs ...any) error {
 	return global.Wrapf(ctx, err, code, message, messageArgs...)
 }
-func (in Instance) Wrapf(ctx context.Context, err error, code, message string, messageArgs ...interface{}) error {
+func (in Instance) Wrapf(ctx context.Context, err error, code, message string, messageArgs ...any) error {
 	if err == nil {
 		return nil
 	}
@@ -304,7 +304,7 @@ func (in Instance) QuickWrap(ctx context.Context, err error) error {
 }
 
 // Fields retrieves the fields from the context
-func Fields(ctx context.Context) map[string]interface{} {
+func Fields(ctx context.Context) map[string]any {
 	if ctx == nil {
 		return nil
 	}
@@ -312,21 +312,21 @@ func Fields(ctx context.Context) map[string]interface{} {
 	if fi == nil {
 		return nil
 	}
-	if f, ok := fi.(map[string]interface{}); ok {
+	if f, ok := fi.(map[string]any); ok {
 		return f
 	}
 	return nil
 }
 
 // SetField adds a field onto the context
-func SetField(ctx context.Context, key string, value interface{}) context.Context {
+func SetField(ctx context.Context, key string, value any) context.Context {
 	return global.SetField(ctx, key, value)
 }
-func (in Instance) SetField(ctx context.Context, key string, value interface{}) context.Context {
+func (in Instance) SetField(ctx context.Context, key string, value any) context.Context {
 	for _, f := range in.FieldHooks {
 		value = f(ctx, value)
 	}
-	f := map[string]interface{}{}
+	f := map[string]any{}
 	for k, v := range Fields(ctx) {
 		f[k] = v
 	}
@@ -335,11 +335,11 @@ func (in Instance) SetField(ctx context.Context, key string, value interface{}) 
 }
 
 // SetFields can add multiple fields onto the context
-func SetFields(ctx context.Context, fields map[string]interface{}) context.Context {
+func SetFields(ctx context.Context, fields map[string]any) context.Context {
 	return global.SetFields(ctx, fields)
 }
-func (in Instance) SetFields(ctx context.Context, fields map[string]interface{}) context.Context {
-	f := map[string]interface{}{}
+func (in Instance) SetFields(ctx context.Context, fields map[string]any) context.Context {
+	f := map[string]any{}
 	for k, v := range Fields(ctx) {
 		f[k] = v
 	}
@@ -370,9 +370,9 @@ func CallerFunc(skip int) string {
 }
 
 // AllFields unwraps the error collecting/replacing fields as it goes down the tree
-func AllFields(err error) map[string]interface{} { return global.AllFields(err) }
-func (in Instance) AllFields(err error) map[string]interface{} {
-	f := map[string]interface{}{}
+func AllFields(err error) map[string]any { return global.AllFields(err) }
+func (in Instance) AllFields(err error) map[string]any {
+	f := map[string]any{}
 	fieldFuncs := append([]func(error) map[string]any{}, in.GetFieldsFuncs...)
 	if len(fieldFuncs) == 0 {
 		fieldFuncs = append(fieldFuncs, DefaultFieldsFunc)
@@ -394,10 +394,10 @@ func (in Instance) AllFields(err error) map[string]interface{} {
 			for _, sk := range in.FieldsAsSlice {
 				if k == sk {
 					if _, ok := f[k]; !ok {
-						f[k] = []interface{}{}
+						f[k] = []any{}
 					}
 
-					f[k] = append(f[k].([]interface{}), v)
+					f[k] = append(f[k].([]any), v)
 					continue OUTER
 				}
 			}
@@ -450,8 +450,8 @@ func As(err error) (CtxErr, bool) {
 }
 
 // HasCategory tells if an error in the chain matches the category
-func HasCategory(err error, category interface{}) bool { return global.HasCategory(err, category) }
-func (in Instance) HasCategory(err error, category interface{}) bool {
+func HasCategory(err error, category any) bool { return global.HasCategory(err, category) }
+func (in Instance) HasCategory(err error, category any) bool {
 	fieldFuncs := append([]func(error) map[string]any{}, in.GetFieldsFuncs...)
 	if len(fieldFuncs) == 0 {
 		fieldFuncs = append(fieldFuncs, DefaultFieldsFunc)
@@ -504,7 +504,7 @@ func (im *impl) Error() string {
 func (im *impl) Unwrap() error { return im.wrapped }
 
 // As Fulfills the As interface to know if something is the same type
-func (im *impl) As(err interface{}) bool {
+func (im *impl) As(err any) bool {
 	_, ok := err.(CtxErr)
 	return ok
 }
@@ -516,7 +516,7 @@ func (im *impl) Is(err error) bool { return im.As(err) }
 func (im *impl) Context() context.Context { return im.ctx }
 
 // Fields retrieves the fields from the context passed in when the error was created
-func (im *impl) Fields() map[string]interface{} { return Fields(im.ctx) }
+func (im *impl) Fields() map[string]any { return Fields(im.ctx) }
 
 // WithContext replaces the context of the error
 func (im *impl) WithContext(ctx context.Context) { im.ctx = ctx }
@@ -540,10 +540,10 @@ func (in Instance) SetAction(ctx context.Context, action string) context.Context
 }
 
 // SetCategory is equivelent to ctxerr.SetField(ctx, FieldKeyStatusCode, category)
-func SetCategory(ctx context.Context, category interface{}) context.Context {
+func SetCategory(ctx context.Context, category any) context.Context {
 	return global.SetCategory(ctx, category)
 }
-func (in Instance) SetCategory(ctx context.Context, category interface{}) context.Context {
+func (in Instance) SetCategory(ctx context.Context, category any) context.Context {
 	return in.SetField(ctx, FieldKeyCategory, category)
 }
 
@@ -595,10 +595,10 @@ func (in Instance) SetLocationHook(ctx context.Context, code string, wrapping er
 /* HTTP helper function */
 
 // NewHTTP creates a new error with action and status code
-func NewHTTP(ctx context.Context, code, action string, statusCode int, message ...interface{}) error {
+func NewHTTP(ctx context.Context, code, action string, statusCode int, message ...any) error {
 	return global.NewHTTP(ctx, code, action, statusCode, message...)
 }
-func (in Instance) NewHTTP(ctx context.Context, code, action string, statusCode int, message ...interface{}) error {
+func (in Instance) NewHTTP(ctx context.Context, code, action string, statusCode int, message ...any) error {
 	if action != "" {
 		ctx = SetAction(ctx, action)
 	}
@@ -609,10 +609,10 @@ func (in Instance) NewHTTP(ctx context.Context, code, action string, statusCode 
 }
 
 // NewHTTPf creates a new error  with action and status code and message formatting
-func NewHTTPf(ctx context.Context, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
+func NewHTTPf(ctx context.Context, code, action string, statusCode int, message string, messageArgs ...any) error {
 	return global.NewHTTPf(ctx, code, action, statusCode, message, messageArgs...)
 }
-func (in Instance) NewHTTPf(ctx context.Context, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
+func (in Instance) NewHTTPf(ctx context.Context, code, action string, statusCode int, message string, messageArgs ...any) error {
 	if action != "" {
 		ctx = in.SetAction(ctx, action)
 	}
@@ -623,10 +623,10 @@ func (in Instance) NewHTTPf(ctx context.Context, code, action string, statusCode
 }
 
 // WrapHTTP creates a new error with action and status code and another wrapped under it
-func WrapHTTP(ctx context.Context, err error, code, action string, statusCode int, message ...interface{}) error {
+func WrapHTTP(ctx context.Context, err error, code, action string, statusCode int, message ...any) error {
 	return global.WrapHTTP(ctx, err, code, action, statusCode, message...)
 }
-func (in Instance) WrapHTTP(ctx context.Context, err error, code, action string, statusCode int, message ...interface{}) error {
+func (in Instance) WrapHTTP(ctx context.Context, err error, code, action string, statusCode int, message ...any) error {
 	if action != "" {
 		ctx = in.SetAction(ctx, action)
 	}
@@ -637,10 +637,10 @@ func (in Instance) WrapHTTP(ctx context.Context, err error, code, action string,
 }
 
 // WrapHTTPf creates a new error with action and status code and a formatted message with another wrapped under it
-func WrapHTTPf(ctx context.Context, err error, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
+func WrapHTTPf(ctx context.Context, err error, code, action string, statusCode int, message string, messageArgs ...any) error {
 	return global.WrapHTTPf(ctx, err, code, action, statusCode, message, messageArgs...)
 }
-func (in Instance) WrapHTTPf(ctx context.Context, err error, code, action string, statusCode int, message string, messageArgs ...interface{}) error {
+func (in Instance) WrapHTTPf(ctx context.Context, err error, code, action string, statusCode int, message string, messageArgs ...any) error {
 	if action != "" {
 		ctx = in.SetAction(ctx, action)
 	}
