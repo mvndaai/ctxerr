@@ -2,6 +2,7 @@
 Package http is used to generate common HTTP responses.
 
 Use StatusCodeAndResponse(...) in HTTP handlers to return a common JSON response.
+
 	{
 		"error": {
 			"code" : "<code passed to ctxerr.New/Wrap>",
@@ -32,11 +33,11 @@ type (
 
 	// Details of a response
 	Details struct {
-		TraceID string                 `json:"traceID,omitempty"`
-		Code    string                 `json:"code"`
-		Action  string                 `json:"action,omitempty"`
-		Message string                 `json:"messsage,omitempty"`
-		Fields  map[string]interface{} `json:"fields,omitempty"`
+		TraceID string         `json:"traceID,omitempty"`
+		Code    string         `json:"code"`
+		Action  string         `json:"action,omitempty"`
+		Message string         `json:"messsage,omitempty"`
+		Fields  map[string]any `json:"fields,omitempty"`
 	}
 )
 

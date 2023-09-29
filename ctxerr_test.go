@@ -112,7 +112,7 @@ func TestOverall(t *testing.T) {
 		toErr func(context.Context) error
 
 		expectedMessage string
-		expectedFields  map[string]interface{}
+		expectedFields  map[string]any
 		expectedNil     bool
 	}{
 		{
@@ -124,7 +124,7 @@ func TestOverall(t *testing.T) {
 			name:            "errors",
 			toErr:           func(ctx context.Context) error { return errors.New("errors") },
 			expectedMessage: "errors",
-			expectedFields:  map[string]interface{}{},
+			expectedFields:  map[string]any{},
 		},
 		{
 			name: "new",
@@ -132,7 +132,7 @@ func TestOverall(t *testing.T) {
 				return ctxerr.New(ctx, code, "", "new")
 			},
 			expectedMessage: "new",
-			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code},
+			expectedFields:  map[string]any{ctxerr.FieldKeyCode: code},
 		},
 		{
 			name: "newf",
@@ -140,7 +140,7 @@ func TestOverall(t *testing.T) {
 				return ctxerr.Newf(ctx, code, "%s", "newf")
 			},
 			expectedMessage: "newf",
-			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code},
+			expectedFields:  map[string]any{ctxerr.FieldKeyCode: code},
 		},
 		{
 			name: "action",
@@ -149,7 +149,7 @@ func TestOverall(t *testing.T) {
 				return ctxerr.New(ctx, code, "action")
 			},
 			expectedMessage: "action",
-			expectedFields: map[string]interface{}{
+			expectedFields: map[string]any{
 				ctxerr.FieldKeyCode:   code,
 				ctxerr.FieldKeyAction: "action",
 			},
@@ -160,7 +160,7 @@ func TestOverall(t *testing.T) {
 				return ctxerr.Wrap(ctx, errors.New("wrapped"), code, "", "wrap")
 			},
 			expectedMessage: "wrap : wrapped",
-			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code},
+			expectedFields:  map[string]any{ctxerr.FieldKeyCode: code},
 		},
 		{
 			name: "wrapf",
@@ -168,7 +168,7 @@ func TestOverall(t *testing.T) {
 				return ctxerr.Wrapf(ctx, errors.New("wrapped"), code, "%s", "wrapf")
 			},
 			expectedMessage: "wrapf : wrapped",
-			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code},
+			expectedFields:  map[string]any{ctxerr.FieldKeyCode: code},
 		},
 		{
 			name: "nil wrap",
@@ -187,11 +187,11 @@ func TestOverall(t *testing.T) {
 		{
 			name: "with fields",
 			toErr: func(ctx context.Context) error {
-				ctx = ctxerr.SetFields(ctx, map[string]interface{}{"foo": "bar"})
+				ctx = ctxerr.SetFields(ctx, map[string]any{"foo": "bar"})
 				return ctxerr.New(ctx, code, "with fields")
 			},
 			expectedMessage: "with fields",
-			expectedFields:  map[string]interface{}{ctxerr.FieldKeyCode: code, "foo": "bar"},
+			expectedFields:  map[string]any{ctxerr.FieldKeyCode: code, "foo": "bar"},
 		},
 		{
 			name: "new no code",
@@ -199,7 +199,7 @@ func TestOverall(t *testing.T) {
 				return ctxerr.New(ctx, "", "new no code")
 			},
 			expectedMessage: "new no code",
-			expectedFields:  map[string]interface{}{},
+			expectedFields:  map[string]any{},
 		},
 		{
 			name: "newf no code",
@@ -207,7 +207,7 @@ func TestOverall(t *testing.T) {
 				return ctxerr.Newf(ctx, "", "new no code")
 			},
 			expectedMessage: "new no code",
-			expectedFields:  map[string]interface{}{},
+			expectedFields:  map[string]any{},
 		},
 		{
 			name: "wrapf no code",
@@ -215,7 +215,7 @@ func TestOverall(t *testing.T) {
 				return ctxerr.Wrapf(ctx, errors.New("error"), "", "wrapf no code")
 			},
 			expectedMessage: "wrapf no code : error",
-			expectedFields:  map[string]interface{}{},
+			expectedFields:  map[string]any{},
 		},
 		{
 			name: "wrap no message",
@@ -223,7 +223,7 @@ func TestOverall(t *testing.T) {
 				return ctxerr.Wrap(ctx, errors.New("error"), "")
 			},
 			expectedMessage: "error",
-			expectedFields:  map[string]interface{}{},
+			expectedFields:  map[string]any{},
 		},
 	}
 
@@ -266,7 +266,7 @@ func TestQuickWrap(t *testing.T) {
 		err  func(context.Context) error
 
 		expectedMessage string
-		expectedCode    interface{}
+		expectedCode    any
 	}{
 		{
 			name:            "external",
@@ -403,7 +403,7 @@ func TestLocation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			locs := ctxerr.AllFields(tt.err)[ctxerr.FieldKeyLocation].([]interface{})
+			locs := ctxerr.AllFields(tt.err)[ctxerr.FieldKeyLocation].([]any)
 			if len(locs) == 0 {
 				t.Error("Location count is 0")
 			}
@@ -446,7 +446,7 @@ func TestCategory(t *testing.T) {
 	tests := []struct {
 		name     string
 		match    bool
-		category interface{}
+		category any
 		toErr    func(context.Context) error
 	}{
 		{
@@ -552,7 +552,7 @@ func TestAddingToContext(t *testing.T) {
 		t.Error("ectx had an incorrect amount of fields", f)
 	}
 
-	fctx := ctxerr.SetFields(ectx, map[string]interface{}{"f": "f", "g": "g"})
+	fctx := ctxerr.SetFields(ectx, map[string]any{"f": "f", "g": "g"})
 	if f := ctxerr.Fields(fctx); len(f) != 4 {
 		t.Error("fctx had an incorrect amount of fields", f)
 	}
@@ -707,9 +707,9 @@ func TestHTTPFuncs(t *testing.T) {
 	tests := []struct {
 		name               string
 		err                error
-		expectedCode       interface{}
-		expectedAction     interface{}
-		expectedStatusCode interface{}
+		expectedCode       any
+		expectedAction     any
+		expectedStatusCode any
 		expectedMessage    string
 	}{
 		{
