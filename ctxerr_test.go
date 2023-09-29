@@ -1084,3 +1084,48 @@ func TestAddFieldsFuncs(t *testing.T) {
 func TestGlobaTestAddFieldsFuncs(t *testing.T) {
 	ctxerr.AddFieldsFunc(func(_ error) map[string]any { return nil })
 }
+
+func TestJoined(t *testing.T) {
+	actx := ctxerr.SetField(context.Background(), "a", "a")
+	actx = ctxerr.SetCategory(actx, "cat_a")
+	a := ctxerr.New(actx, "CODE_A", "msg_a")
+
+	bctx := ctxerr.SetField(context.Background(), "b", "b")
+	bctx = ctxerr.SetCategory(bctx, "cat_b")
+	b := ctxerr.New(bctx, "CODE_B", "msg_b")
+
+	cctx := ctxerr.SetField(context.Background(), "c", "c")
+	c := ctxerr.Wrap(cctx, errors.Join(a, b), "CODE_C", "msg_c")
+
+	if !ctxerr.HasCategory(c, "cat_a") {
+		t.Error("missing category cat_a")
+	}
+	if !ctxerr.HasCategory(c, "cat_b") {
+		t.Error("missing category cat_b")
+	}
+
+	if !ctxerr.HasField(c, "a") {
+		t.Error("missing field a")
+	}
+	if !ctxerr.HasField(c, "b") {
+		t.Error("missing field b")
+	}
+
+	f := ctxerr.AllFields(c)
+	expectedFields := map[string]any{
+		"a":              "a",
+		"b":              "b",
+		"c":              "c",
+		"error_code":     "CODE_B",
+		"error_category": "cat_b",
+		"error_location": []any{
+			"ctxerr_test.TestJoined",
+			"ctxerr_test.TestJoined",
+			"ctxerr_test.TestJoined",
+		},
+	}
+
+	if !reflect.DeepEqual(f, expectedFields) {
+		t.Errorf("fields didn't match \n%#v\n%#v", f, expectedFields)
+	}
+}

@@ -93,6 +93,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/mvndaai/ctxerr/joinederr"
 )
 
 var global Instance
@@ -378,7 +380,9 @@ func (in Instance) AllFields(err error) map[string]any {
 		fieldFuncs = append(fieldFuncs, DefaultFieldsFunc)
 	}
 
+	iter := joinederr.NewDepthFirstIterator(err)
 	for {
+		err = iter.Next()
 		if err == nil {
 			return f
 		}
@@ -403,7 +407,6 @@ func (in Instance) AllFields(err error) map[string]any {
 			}
 			f[k] = v
 		}
-		err = errors.Unwrap(err)
 	}
 }
 
@@ -415,7 +418,9 @@ func (in Instance) HasField(err error, field string) bool {
 		fieldFuncs = append(fieldFuncs, DefaultFieldsFunc)
 	}
 
+	iter := joinederr.NewDepthFirstIterator(err)
 	for {
+		err = iter.Next()
 		if err == nil {
 			return false
 		}
@@ -430,8 +435,6 @@ func (in Instance) HasField(err error, field string) bool {
 		if _, ok := fields[field]; ok {
 			return true
 		}
-
-		err = errors.Unwrap(err)
 	}
 }
 
@@ -457,7 +460,9 @@ func (in Instance) HasCategory(err error, category any) bool {
 		fieldFuncs = append(fieldFuncs, DefaultFieldsFunc)
 	}
 
+	iter := joinederr.NewDepthFirstIterator(err)
 	for {
+		err = iter.Next()
 		if err == nil {
 			return false
 		}
@@ -474,8 +479,6 @@ func (in Instance) HasCategory(err error, category any) bool {
 				return true
 			}
 		}
-
-		err = errors.Unwrap(err)
 	}
 }
 
