@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -87,6 +88,20 @@ func TestNil(t *testing.T) {
 		}()
 		var in *ctxerr.Instance
 		in.AddFieldHook(func(_ context.Context, v any) any { return v })
+	}()
+
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				if !strings.HasSuffix(fmt.Sprint(r), "ctxerr.Instance is nil") {
+					t.Error("recovered with wrong message:", r)
+				}
+			} else {
+				t.Error("expected to recover")
+			}
+		}()
+		var in *ctxerr.Instance
+		in.AddFieldsFunc(func(error) map[string]any { return nil })
 	}()
 }
 
@@ -925,4 +940,147 @@ func TestFieldHook(t *testing.T) {
 
 func TestGlobalFieldsHook(t *testing.T) {
 	ctxerr.AddFieldHook(func(_ context.Context, a any) any { return a })
+}
+
+type FieldError struct {
+	fields map[string]any
+	err    error
+}
+
+func (fe FieldError) Error() string {
+	return fe.err.Error()
+}
+
+func (fe FieldError) Fields() map[string]any {
+	return fe.fields
+}
+
+func (fe FieldError) Unwrap() error {
+	return errors.Unwrap(fe.err)
+}
+
+func NewFieldError(msg string, fields map[string]any) error {
+	return FieldError{
+		fields: fields,
+		err:    fmt.Errorf(msg),
+	}
+}
+
+func WrapFieldError(err error, msg string, fields map[string]any) error {
+	return FieldError{
+		fields: fields,
+		err:    fmt.Errorf("%s : %w", msg, err),
+	}
+}
+
+func TestAllFieldsWithMultipleTypesOfErrors(t *testing.T) {
+	var _ error = FieldError{}
+
+	err := NewFieldError("bottom", map[string]any{"a": "a"})
+	err = fmt.Errorf("fmt : %w", err)
+	ctx := ctxerr.SetField(context.Background(), "b", "b")
+	ctx = ctxerr.SetCategory(ctx, "category1")
+	err = ctxerr.Wrap(ctx, err, "CTXERR_CODE_1", "ctxerr1")
+	ctx = ctxerr.SetCategory(ctx, "category2")
+	err = ctxerr.Wrap(ctx, err, "CTXERR_CODE_2", "ctxerr2")
+	err = WrapFieldError(err, "wrapfe", map[string]any{"c": "c"})
+
+	expectedMessage := "wrapfe : ctxerr2 : ctxerr1 : fmt : bottom"
+	if msg := err.Error(); msg != expectedMessage {
+		t.Errorf("message didn't match \n'%s'\n'%s'", msg, expectedMessage)
+	}
+
+	f := ctxerr.AllFields(err)
+	expectedFields := map[string]any{
+		"a":              "a",
+		"b":              "b",
+		"c":              "c",
+		"error_code":     "CTXERR_CODE_1",
+		"error_category": "category1",
+		"error_location": []any{
+			"ctxerr_test.TestAllFieldsWithMultipleTypesOfErrors",
+			"ctxerr_test.TestAllFieldsWithMultipleTypesOfErrors",
+		},
+	}
+	if !reflect.DeepEqual(f, expectedFields) {
+		t.Errorf("fields didn't match \n%#v\n%#v", f, expectedFields)
+	}
+
+	if !ctxerr.HasField(err, "a") {
+		t.Error("missing in HasField")
+	}
+
+	if !ctxerr.HasCategory(err, "category2") {
+		t.Error("missing category2")
+	}
+	if !ctxerr.HasCategory(err, "category1") {
+		t.Error("missing category1")
+	}
+}
+
+type OtherFieldFuncError struct {
+	fields map[string]any
+	err    error
+}
+
+func (offe OtherFieldFuncError) Error() string {
+	return offe.err.Error()
+}
+
+func (offe OtherFieldFuncError) FieldsMap() map[string]any {
+	return offe.fields
+}
+
+func (offe OtherFieldFuncError) Unwrap() error {
+	return errors.Unwrap(offe.err)
+}
+
+type IFieldsMap interface {
+	FieldsMap() map[string]any
+}
+
+func NewOtherFieldFuncError(msg string, fields map[string]any) error {
+	return OtherFieldFuncError{
+		fields: fields,
+		err:    fmt.Errorf(msg),
+	}
+}
+
+func TestAddFieldsFuncs(t *testing.T) {
+	in := ctxerr.NewInstance()
+	in.AddFieldsFunc(func(err error) map[string]any {
+		if v, ok := err.(IFieldsMap); ok {
+			return v.FieldsMap()
+		}
+		return nil
+	})
+
+	err := NewOtherFieldFuncError("msg", map[string]any{"a": "a"})
+	if in.AllFields(err)["a"] != "a" {
+		t.Error("field not set from interface")
+	}
+
+	err = ctxerr.New(ctxerr.SetField(context.Background(), "b", "b"), "CODE", "msg")
+	if in.AllFields(err)["b"] != "b" {
+		t.Error("field not set from default interface")
+	}
+
+	// Ensure empty funcs defaults
+	in.GetFieldsFuncs = nil
+	ctx := ctxerr.SetField(context.Background(), "c", "c")
+	ctx = ctxerr.SetCategory(ctx, "foo")
+	err = ctxerr.New(ctx, "CODE", "msg")
+	if in.AllFields(err)["c"] != "c" {
+		t.Error("field not set from default interface fallback")
+	}
+	if !in.HasCategory(err, "foo") {
+		t.Error("missing category")
+	}
+	if !in.HasField(err, "c") {
+		t.Error("missing hasField")
+	}
+}
+
+func TestGlobaTestAddFieldsFuncs(t *testing.T) {
+	ctxerr.AddFieldsFunc(func(_ error) map[string]any { return nil })
 }
