@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -427,18 +429,43 @@ func TestLocation(t *testing.T) {
 
 func TestDefaultLogNonJSONFields(t *testing.T) {
 	ctx := ctxerr.SetField(context.Background(), "foo", func() {})
-	err := ctxerr.New(ctx, "", "")
+	err := ctxerr.New(ctx, "CODE", "msg")
 
-	sb := &strings.Builder{}
-	log.SetOutput(sb)
+	// Capture stdout
+	originalStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Run the test
 	ctxerr.DefaultLogHook(err)
 
-	out := strings.TrimSpace(sb.String())
-	log := strings.SplitAfter(out, "json: ")[1]
-	expectedLog := "unsupported type: func()"
+	// Set stdout back to normal; read the output
+	w.Close()
+	os.Stdout = originalStdout
+	out, _ := io.ReadAll(r)
 
-	if log != expectedLog {
-		t.Errorf("Logs did not match\n%s\n%s", log, expectedLog)
+	expectedFields := map[string]any{
+		//"time":           "2024-03-06T14:33:09.03475-07:00",
+		"level":          "ERROR",
+		"msg":            "msg",
+		"foo":            "!ERROR:json: unsupported type: func()",
+		"error_code":     "CODE",
+		"error_location": []any{"ctxerr_test.TestDefaultLogNonJSONFields"},
+	}
+
+	actualMap := map[string]any{}
+	err = json.Unmarshal([]byte(out), &actualMap)
+	if err != nil {
+		t.Error(err)
+	}
+	for k, v := range expectedFields {
+		if av, ok := actualMap[k]; !ok || fmt.Sprint(av) != fmt.Sprint(v) {
+			t.Errorf("Field did not match\n%s\n%s", av, v)
+		}
+	}
+
+	if _, ok := actualMap["time"]; !ok {
+		t.Error("time field was not present")
 	}
 }
 

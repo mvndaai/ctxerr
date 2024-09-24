@@ -86,10 +86,10 @@ package ctxerr
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -556,13 +556,15 @@ func (in Instance) SetCategory(ctx context.Context, category any) context.Contex
 // It is the fallback if there are no other handle hooks
 func DefaultLogHook(err error) { global.DefaultLogHook(err) }
 func (in Instance) DefaultLogHook(err error) {
-	f := in.AllFields(err)
-	b, merr := json.Marshal(f)
-	fields := string(b)
-	if merr != nil {
-		fields = fmt.Sprintf("fields '%v' could not be marshalled as JSON: %s", f, merr)
+	if err == nil {
+		return
 	}
-	log.Printf("%s - %s", err, fields)
+	f := in.AllFields(err)
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	for k, v := range f {
+		logger = logger.With(k, v)
+	}
+	logger.Error(err.Error())
 }
 
 // DefaultFieldsFunc is the default function to get fields from an error
