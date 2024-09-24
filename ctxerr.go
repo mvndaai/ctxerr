@@ -371,6 +371,15 @@ func CallerFunc(skip int) string {
 	return f
 }
 
+// CallerFuncs is a shortcut for calling CallerFunc many times
+func CallerFuncs(skip, depth int) []string {
+	f := []string{}
+	for i := 0; i < depth; i++ {
+		f = append(f, CallerFunc(skip+i+1))
+	}
+	return f
+}
+
 // AllFields unwraps the error collecting/replacing fields as it goes down the tree
 func AllFields(err error) map[string]any { return global.AllFields(err) }
 func (in Instance) AllFields(err error) map[string]any {
