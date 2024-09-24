@@ -337,6 +337,31 @@ func TestCallerFunc(t *testing.T) {
 	}
 }
 
+func testCallerA(skip, depth int) []string { return ctxerr.CallerFuncs(skip, depth) }
+func testCallerB(skip, depth int) []string { return testCallerA(skip, depth) }
+func testCallerC(skip, depth int) []string { return testCallerB(skip, depth) }
+
+func TestCallerFuncs(t *testing.T) {
+	fns := testCallerC(0, 3)
+	expected := []string{
+		"ctxerr_test.testCallerA",
+		"ctxerr_test.testCallerB",
+		"ctxerr_test.testCallerC",
+	}
+	if fmt.Sprint(fns) != fmt.Sprint(expected) {
+		t.Error("Did not match expected", fns, expected)
+	}
+
+	fns = testCallerC(1, 2)
+	expected = []string{
+		"ctxerr_test.testCallerB",
+		"ctxerr_test.testCallerC",
+	}
+	if fmt.Sprint(fns) != fmt.Sprint(expected) {
+		t.Error("Did not match expected", fns, expected)
+	}
+}
+
 func TestLocation(t *testing.T) {
 	tests := []struct {
 		name            string
