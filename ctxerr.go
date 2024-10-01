@@ -374,7 +374,7 @@ func CallerFunc(skip int) string {
 // CallerFuncs is a shortcut for calling CallerFunc many times
 func CallerFuncs(skip, depth int) []string {
 	f := []string{}
-	for i := 0; i < depth; i++ {
+	for i := range depth {
 		f = append(f, CallerFunc(skip+i+1))
 	}
 	return f
