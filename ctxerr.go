@@ -92,6 +92,7 @@ import (
 	"log"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/mvndaai/ctxerr/joinederr"
@@ -402,17 +403,14 @@ func (in Instance) AllFields(err error) map[string]any {
 				fields[k] = v
 			}
 		}
-	OUTER:
 		for k, v := range fields {
-			for _, sk := range in.FieldsAsSlice {
-				if k == sk {
-					if _, ok := f[k]; !ok {
-						f[k] = []any{}
-					}
-
-					f[k] = append(f[k].([]any), v)
-					continue OUTER
+			if slices.Contains(in.FieldsAsSlice, k) {
+				if _, ok := f[k]; !ok {
+					f[k] = []any{}
 				}
+
+				f[k] = append(f[k].([]any), v)
+				continue
 			}
 			f[k] = v
 		}
