@@ -90,9 +90,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/mvndaai/ctxerr/joinederr"
@@ -329,10 +331,12 @@ func (in Instance) SetField(ctx context.Context, key string, value any) context.
 	for _, f := range in.FieldHooks {
 		value = f(ctx, value)
 	}
-	f := map[string]any{}
-	for k, v := range Fields(ctx) {
-		f[k] = v
+	value, ok := validFieldValue(key, value)
+	if !ok {
+		return ctx
 	}
+	f := map[string]any{}
+	maps.Copy(f, Fields(ctx))
 	f[key] = value
 	return context.WithValue(ctx, FieldsKey, f)
 }
@@ -343,16 +347,34 @@ func SetFields(ctx context.Context, fields map[string]any) context.Context {
 }
 func (in Instance) SetFields(ctx context.Context, fields map[string]any) context.Context {
 	f := map[string]any{}
-	for k, v := range Fields(ctx) {
-		f[k] = v
-	}
+	maps.Copy(f, Fields(ctx))
 	for k, v := range fields {
 		for _, f := range in.FieldHooks {
 			v = f(ctx, v)
 		}
-		f[k] = v
+		if v, ok := validFieldValue(k, v); ok {
+			f[k] = v
+		}
 	}
 	return context.WithValue(ctx, FieldsKey, f)
+}
+
+func validFieldValue(key string, value any) (any, bool) {
+	if key == FieldKeyStatusCode {
+		vInt, ok := value.(int)
+		if !ok {
+			var err error
+			vInt, err = strconv.Atoi(fmt.Sprint(value))
+			if err != nil {
+				return nil, false
+			}
+		}
+		if (vInt < 100 || vInt > 599) && vInt != 999 {
+			return nil, false
+		}
+		value = vInt
+	}
+	return value, true
 }
 
 // CallerFunc gets the name of the calling function
@@ -399,9 +421,7 @@ func (in Instance) AllFields(err error) map[string]any {
 
 		fields := map[string]any{}
 		for _, fn := range fieldFuncs {
-			for k, v := range fn(err) {
-				fields[k] = v
-			}
+			maps.Copy(fields, fn(err))
 		}
 		for k, v := range fields {
 			if slices.Contains(in.FieldsAsSlice, k) {
@@ -434,15 +454,24 @@ func (in Instance) HasField(err error, field string) bool {
 
 		fields := map[string]any{}
 		for _, fn := range fieldFuncs {
-			for k, v := range fn(err) {
-				fields[k] = v
-			}
+			maps.Copy(fields, fn(err))
 		}
 
 		if _, ok := fields[field]; ok {
 			return true
 		}
 	}
+}
+
+func ExtracField[T any](err error, field string) (T, bool) {
+	f := AllFields(err)
+	if vAny, ok := f[field]; ok {
+		if v, ok := vAny.(T); ok {
+			return v, true
+		}
+	}
+	var zero T
+	return zero, false
 }
 
 // As is a shorthand for errors.As and includes an ok
@@ -476,9 +505,7 @@ func (in Instance) HasCategory(err error, category any) bool {
 
 		fields := map[string]any{}
 		for _, fn := range fieldFuncs {
-			for k, v := range fn(err) {
-				fields[k] = v
-			}
+			maps.Copy(fields, fn(err))
 		}
 
 		if c, ok := fields[FieldKeyCategory]; ok {
