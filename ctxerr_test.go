@@ -987,7 +987,7 @@ func (fe FieldError) Unwrap() error {
 func NewFieldError(msg string, fields map[string]any) error {
 	return FieldError{
 		fields: fields,
-		err:    fmt.Errorf(msg),
+		err:    errors.New(msg),
 	}
 }
 
@@ -1067,7 +1067,7 @@ type IFieldsMap interface {
 func NewOtherFieldFuncError(msg string, fields map[string]any) error {
 	return OtherFieldFuncError{
 		fields: fields,
-		err:    fmt.Errorf(msg),
+		err:    errors.New(msg),
 	}
 }
 
