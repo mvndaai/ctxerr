@@ -422,7 +422,7 @@ func TestLocation(t *testing.T) {
 				}(ctx)
 				return ctxerr.QuickWrap(ctx, err)
 			}(),
-			locationPrefixs: []string{"ctxerr_test.TestLocation.func1", "ctxerr_test.TestLocation.func1.1"},
+			locationPrefixs: []string{"ctxerr_test.TestLocation.func1", "ctxerr_test.TestLocation.func1.func1"},
 		},
 	}
 
@@ -987,7 +987,7 @@ func (fe FieldError) Unwrap() error {
 func NewFieldError(msg string, fields map[string]any) error {
 	return FieldError{
 		fields: fields,
-		err:    fmt.Errorf(msg),
+		err:    errors.New(msg),
 	}
 }
 
@@ -1067,7 +1067,7 @@ type IFieldsMap interface {
 func NewOtherFieldFuncError(msg string, fields map[string]any) error {
 	return OtherFieldFuncError{
 		fields: fields,
-		err:    fmt.Errorf(msg),
+		err:    errors.New(msg),
 	}
 }
 
@@ -1152,5 +1152,106 @@ func TestJoined(t *testing.T) {
 
 	if !reflect.DeepEqual(f, expectedFields) {
 		t.Errorf("fields didn't match \n%#v\n%#v", f, expectedFields)
+	}
+}
+
+func TestExtracField(t *testing.T) {
+	ctx := context.Background()
+	ctx = ctxerr.SetField(ctx, "str", "value")
+	ctx = ctxerr.SetField(ctx, "num", 42)
+	err := ctxerr.New(ctx, "code", "msg")
+
+	tests := []struct {
+		name   string
+		call   func() (any, bool)
+		want   any
+		wantOk bool
+	}{
+		{
+			name:   "string field correct type",
+			call:   func() (any, bool) { return ctxerr.ExtracField[string](err, "str") },
+			want:   "value",
+			wantOk: true,
+		},
+		{
+			name:   "int field correct type",
+			call:   func() (any, bool) { return ctxerr.ExtracField[int](err, "num") },
+			want:   42,
+			wantOk: true,
+		},
+		{
+			name:   "any type",
+			call:   func() (any, bool) { return ctxerr.ExtracField[any](err, "str") },
+			want:   "value",
+			wantOk: true,
+		},
+		{
+			name:   "field missing string",
+			call:   func() (any, bool) { return ctxerr.ExtracField[string](err, "missing") },
+			want:   "",
+			wantOk: false,
+		},
+		{
+			name:   "field missing any",
+			call:   func() (any, bool) { return ctxerr.ExtracField[any](err, "missing") },
+			want:   nil,
+			wantOk: false,
+		},
+		{
+			name:   "field wrong type",
+			call:   func() (any, bool) { return ctxerr.ExtracField[int](err, "str") },
+			want:   0,
+			wantOk: false,
+		},
+		{
+			name:   "nil error",
+			call:   func() (any, bool) { return ctxerr.ExtracField[string](nil, "str") },
+			want:   "",
+			wantOk: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := tt.call()
+			if ok != tt.wantOk {
+				t.Errorf("ok did not match: got %v want %v", ok, tt.wantOk)
+			}
+			if got != tt.want {
+				t.Errorf("value did not match: got %v want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestStatusCodeValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		want    any
+		wantSet bool
+	}{
+		{name: "valid int", value: 200, want: 200, wantSet: true},
+		{name: "valid string int", value: "404", want: 404, wantSet: true},
+		{name: "valid 999", value: 999, want: 999, wantSet: true},
+		{name: "boundary low", value: 100, want: 100, wantSet: true},
+		{name: "boundary high", value: 599, want: 599, wantSet: true},
+		{name: "too low", value: 99, want: nil, wantSet: false},
+		{name: "too high", value: 600, want: nil, wantSet: false},
+		{name: "negative", value: -1, want: nil, wantSet: false},
+		{name: "non numeric string", value: "abc", want: nil, wantSet: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := ctxerr.SetField(context.Background(), ctxerr.FieldKeyStatusCode, tt.value)
+			v, ok := ctxerr.Fields(ctx)[ctxerr.FieldKeyStatusCode]
+			if ok != tt.wantSet {
+				t.Errorf("field presence did not match: got %v want %v", ok, tt.wantSet)
+			}
+			if ok && v != tt.want {
+				t.Errorf("value did not match: got %v want %v", v, tt.want)
+			}
+		})
 	}
 }
